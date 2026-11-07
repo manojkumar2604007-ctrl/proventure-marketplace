@@ -1,0 +1,310 @@
+// This is your Prisma schema file for PROVENTURE MARKETPLACE
+// Configured for Neon PostgreSQL with connection pooling & direct URL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  CUSTOMER
+  SELLER
+  ADMIN
+}
+
+enum SellerStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+  OUT_OF_STOCK
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+}
+
+model User {
+  id            String        @id @default(cuid())
+  name          String?
+  email         String        @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  phone         String?
+  role          Role          @default(CUSTOMER)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  sellerProfile SellerProfile?
+  addresses     Address[]
+  orders        Order[]       @relation("CustomerOrders")
+  reviews       Review[]
+  wishlist      WishlistItem[]
+}
+
+model SellerProfile {
+  id             String       @id @default(cuid())
+  userId         String       @unique
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeName      String
+  slug           String       @unique
+  description    String?
+  logo           String?
+  banner         String?
+  phone          String?
+  email          String?
+  address        String?
+  city           String?
+  state          String?
+  postalCode     String?
+  commissionRate Float        @default(10.0) // 10% marketplace default
+  status         SellerStatus @default(PENDING)
+  rating         Float        @default(5.0)
+  reviewCount    Int          @default(0)
+  totalSales     Float        @default(0.0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  products       Product[]
+  orderItems     OrderItem[]
+  payouts        Payout[]
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  image       String?
+  icon        String?
+  parentId    String?
+  parent      Category?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("SubCategories")
+  featured    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  products    Product[]
+}
+
+model Product {
+  id               String          @id @default(cuid())
+  title            String
+  slug             String          @unique
+  description      String
+  shortDescription String?
+  price            Float
+  comparePrice     Float?
+  sku              String?         @unique
+  stock            Int             @default(0)
+  status           ProductStatus   @default(ACTIVE)
+  featured         Boolean         @default(false)
+  tags             String[]        @default([])
+  rating           Float           @default(5.0)
+  reviewCount      Int             @default(0)
+  
+  sellerId         String
+  seller           SellerProfile   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  
+  categoryId       String
+  category         Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  images           ProductImage[]
+  variants         ProductVariant[]
+  reviews          Review[]
+  orderItems       OrderItem[]
+  wishlistItems    WishlistItem[]
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+  isPrimary Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model ProductVariant {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String   // e.g. "Size: L / Color: Navy"
+  sku       String?  @unique
+  price     Float
+  stock     Int      @default(0)
+  options   Json?    // e.g. {"Size": "L", "Color": "Navy"}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  orderNumber     String        @unique
+  customerId      String
+  customer        User          @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: Restrict)
+  
+  status          OrderStatus   @default(PENDING)
+  paymentStatus   PaymentStatus @default(PENDING)
+  
+  subtotal        Float
+  shippingFee     Float         @default(0.0)
+  tax             Float         @default(0.0)
+  discount        Float         @default(0.0)
+  total           Float
+
+  shippingAddress Json          // Full snapshot of address object
+  billingAddress  Json?
+  
+  notes           String?
+  payment         Payment?
+  items           OrderItem[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model OrderItem {
+  id                String        @id @default(cuid())
+  orderId           String
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId         String
+  product           Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  
+  sellerId          String
+  seller            SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  
+  title             String
+  price             Float
+  quantity          Int
+  total             Float
+  variantName       String?
+  
+  fulfillmentStatus OrderStatus   @default(PENDING)
+  trackingNumber    String?
+  carrier           String?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String        @unique
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  razorpayOrderId   String?       @unique
+  razorpayPaymentId String?       @unique
+  razorpaySignature String?
+  
+  amount            Float
+  currency          String        @default("INR")
+  status            PaymentStatus @default(PENDING)
+  method            String?       // "upi", "card", "netbanking", "cod"
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Review {
+  id               String   @id @default(cuid())
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  customerId       String
+  customer         User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  rating           Int      // 1 to 5
+  title            String?
+  comment          String
+  verifiedPurchase Boolean  @default(true)
+  sellerResponse   String?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model WishlistItem {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, productId])
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  fullName   String
+  phone      String
+  street     String
+  city       String
+  state      String
+  postalCode String
+  country    String   @default("India")
+  isDefault  Boolean  @default(false)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Payout {
+  id                 String       @id @default(cuid())
+  sellerId           String
+  seller             SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  
+  amount             Float
+  commissionDeducted Float
+  netAmount          Float
+  status             PayoutStatus @default(PENDING)
+  referenceNumber    String?
+  notes              String?
+  
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
