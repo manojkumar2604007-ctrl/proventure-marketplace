@@ -38,9 +38,9 @@ export const productService = {
           prisma.product.findMany({
             where: whereClause,
             include: {
-              images: { orderBy: { order: "asc" } },
+              images: { orderBy: { displayOrder: "asc" } },
               variants: true,
-              seller: true,
+              store: true,
               category: true,
             },
             take: params.limit || 24,
@@ -128,12 +128,12 @@ export const productService = {
         const product = await prisma.product.findUnique({
           where: { slug },
           include: {
-            images: { orderBy: { order: "asc" } },
+            images: { orderBy: { displayOrder: "asc" } },
             variants: true,
-            seller: true,
+            store: true,
             category: true,
             reviews: {
-              include: { customer: true },
+              include: { user: true },
               orderBy: { createdAt: "desc" },
             },
           },
