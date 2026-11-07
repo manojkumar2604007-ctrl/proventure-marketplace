@@ -1,62 +1,90 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUIStore } from "@/store/ui-store";
-import { Lock, Mail, ArrowRight, ShieldCheck, Store, User } from "lucide-react";
+import { Lock, Mail, ArrowRight, ShieldCheck, Store, User, AlertCircle } from "lucide-react";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "";
+  const errorParam = searchParams.get("error");
   const { addToast } = useUIStore();
+
   const [email, setEmail] = useState("customer@example.com");
   const [password, setPassword] = useState("password123");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(
+    errorParam === "AdminAccessDenied"
+      ? "Access Denied: Administrator role required to enter the Admin Console."
+      : errorParam === "AccountSuspended"
+      ? "Your account has been suspended by administration."
+      : ""
+  );
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage("");
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+      });
+
       setIsSubmitting(false);
+
+      if (res?.error) {
+        setErrorMessage(res.error);
+        addToast({
+          title: "Sign In Failed",
+          description: res.error,
+          type: "error",
+        });
+        return;
+      }
+
       addToast({
         title: "Signed In Successfully",
-        description: `Welcome back! Signed in as ${email}.`,
+        description: `Welcome back, ${email}!`,
         type: "success",
       });
 
-      if (email.includes("admin")) {
+      // Role-based routing
+      if (callbackUrl) {
+        router.push(callbackUrl);
+      } else if (email.includes("admin")) {
         router.push("/admin");
       } else if (email.includes("seller")) {
         router.push("/seller");
       } else {
         router.push("/customer");
       }
-    }, 600);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      setErrorMessage(err.message || "An unexpected error occurred.");
+    }
   };
 
   const handleQuickRole = (role: "customer" | "seller" | "admin") => {
+    setErrorMessage("");
     if (role === "customer") {
       setEmail("customer@example.com");
       setPassword("password123");
-      router.push("/customer");
     } else if (role === "seller") {
       setEmail("seller@technexus.com");
       setPassword("password123");
-      router.push("/seller");
     } else {
       setEmail("admin@proventure.com");
       setPassword("password123");
-      router.push("/admin");
     }
-
-    addToast({
-      title: `Switched to ${role.toUpperCase()} Persona`,
-      description: `Logged in to ${role} portal.`,
-      type: "success",
-    });
   };
 
   return (
@@ -76,14 +104,14 @@ export default function LoginPage() {
             Sign In to Your Account
           </h1>
           <p className="text-xs text-muted-foreground">
-            Access your customer orders, vendor dashboard, or platform administration
+            Multi-portal secure authentication powered by Auth.js & Neon
           </p>
         </div>
 
         {/* Demo Fast Logins for instant evaluation */}
         <div className="p-4 rounded-2xl border bg-muted/40 space-y-2">
           <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block text-center">
-            ⚡ Quick Demo Portal Access
+            ⚡ Quick Demo Portal Switcher
           </span>
           <div className="grid grid-cols-3 gap-2">
             <Button
@@ -119,6 +147,14 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {/* Error notification banner */}
+        {errorMessage && (
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         {/* Login Form */}
         <form onSubmit={handleLogin} className="p-6 rounded-3xl border bg-card shadow-sm space-y-4">
           <div>
@@ -142,7 +178,10 @@ export default function LoginPage() {
               <label className="text-xs font-semibold text-foreground">
                 Password
               </label>
-              <Link href="#" className="text-[11px] text-primary hover:underline">
+              <Link
+                href="/forgot-password"
+                className="text-[11px] text-primary font-medium hover:underline"
+              >
                 Forgot password?
               </Link>
             </div>
@@ -164,7 +203,7 @@ export default function LoginPage() {
             size="lg"
             className="w-full rounded-xl text-xs font-bold gap-2 mt-2"
           >
-            <span>{isSubmitting ? "Authenticating..." : "Sign In"}</span>
+            <span>{isSubmitting ? "Authenticating..." : "Sign In with Auth.js"}</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </Button>
 
@@ -181,5 +220,19 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[85vh] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

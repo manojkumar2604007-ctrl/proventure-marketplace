@@ -23,6 +23,13 @@ enum Role {
   ADMIN
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  DEACTIVATED
+}
+
 enum SellerStatus {
   PENDING
   APPROVED
@@ -94,6 +101,7 @@ model User {
   image         String?
   phone         String?
   role          Role          @default(CUSTOMER)
+  status        UserStatus    @default(ACTIVE)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -674,4 +682,20 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([action])
   @@index([userId])
+}
+
+// ==========================================
+// 24. VerificationToken Model (Auth.js)
+// ==========================================
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  type       String   @default("EMAIL_VERIFICATION") // "EMAIL_VERIFICATION" or "PASSWORD_RESET"
+  createdAt  DateTime @default(now())
+
+  @@unique([identifier, token])
+  @@index([identifier])
+  @@index([token])
 }
