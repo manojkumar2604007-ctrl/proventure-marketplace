@@ -1,9 +1,93 @@
 import { prisma } from "@/lib/db/prisma";
 import { MOCK_PRODUCTS } from "@/lib/db/mock-data";
-import { Product, ProductFilterParams, ProductStatus } from "@/types";
+import { Product, ProductFilterParams, ProductStatus, SellerProfile, ProductImage } from "@/types";
 
-// In-memory working copy for local dev updates
+// In-memory working copy for local dev updates or offline fallback
 let localProducts: Product[] = [...MOCK_PRODUCTS];
+
+// Helper to convert Prisma DB item (with Decimal & store relation) to Product interface
+function mapPrismaProduct(item: any): Product {
+  const images: ProductImage[] = (item.images || []).map((img: any) => ({
+    id: img.id,
+    url: img.url,
+    altText: img.altText || item.title,
+    isPrimary: img.isPrimary,
+    order: img.displayOrder ?? 0,
+  }));
+
+  const seller: SellerProfile = {
+    id: item.store?.id || item.storeId,
+    userId: item.store?.sellerProfile?.userId || "",
+    storeName: item.store?.name || "Verified Merchant",
+    slug: item.store?.slug || "store",
+    description: item.store?.description,
+    logo: item.store?.logo || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80",
+    banner: item.store?.banner || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1200&auto=format&fit=crop&q=80",
+    email: item.store?.sellerProfile?.businessEmail,
+    phone: item.store?.sellerProfile?.businessPhone,
+    commissionRate: item.store?.commissionRate ? Number(item.store.commissionRate) : 10,
+    status: item.store?.isActive ? "APPROVED" : "PENDING",
+    rating: item.store?.rating ? Number(item.store.rating) : 5.0,
+    reviewCount: item.store?.reviewCount ?? 0,
+    totalSales: item.store?.totalSales ? Number(item.store.totalSales) : 0,
+  };
+
+  // Stock calculation from inventories
+  const stock = item.inventories && item.inventories.length > 0
+    ? item.inventories.reduce((acc: number, inv: any) => acc + (inv.quantity - inv.reserved), 0)
+    : 25;
+
+  return {
+    id: item.id,
+    title: item.title,
+    slug: item.slug,
+    description: item.description,
+    shortDescription: item.shortDescription,
+    price: Number(item.price),
+    comparePrice: item.comparePrice ? Number(item.comparePrice) : null,
+    sku: item.sku,
+    stock: stock > 0 ? stock : 0,
+    status: (item.status as ProductStatus) || "ACTIVE",
+    featured: item.featured ?? false,
+    tags: item.tags || [],
+    rating: Number(item.rating || 5.0),
+    reviewCount: item.reviewCount || 0,
+    sellerId: item.storeId,
+    seller,
+    categoryId: item.categoryId,
+    category: item.category
+      ? {
+          id: item.category.id,
+          name: item.category.name,
+          slug: item.category.slug,
+          description: item.category.description,
+          image: item.category.image,
+          icon: item.category.icon,
+          featured: item.category.featured,
+        }
+      : undefined,
+    images: images.length > 0
+      ? images
+      : [
+          {
+            id: `img_${item.id}`,
+            url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80",
+            isPrimary: true,
+            order: 0,
+          },
+        ],
+    variants: (item.variants || []).map((v: any) => ({
+      id: v.id,
+      name: v.name,
+      sku: v.sku,
+      price: Number(v.price),
+      stock: 15,
+      options: v.options as Record<string, string>,
+    })),
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  };
+}
 
 export const productService = {
   async getProducts(params: ProductFilterParams = {}): Promise<{
@@ -11,7 +95,7 @@ export const productService = {
     total: number;
   }> {
     try {
-      // Attempt Neon DB query if configured and not fallback
+      // Query Neon PostgreSQL if connection is present
       if (process.env.DATABASE_URL && process.env.NEXT_PUBLIC_USE_MOCK_FALLBACK !== "true") {
         const whereClause: any = {
           status: "ACTIVE",
@@ -21,7 +105,7 @@ export const productService = {
           whereClause.category = { slug: params.category };
         }
         if (params.seller) {
-          whereClause.seller = { slug: params.seller };
+          whereClause.store = { slug: params.seller };
         }
         if (params.search) {
           whereClause.OR = [
@@ -33,6 +117,23 @@ export const productService = {
         if (params.featured !== undefined) {
           whereClause.featured = params.featured;
         }
+        if (params.minPrice !== undefined || params.maxPrice !== undefined) {
+          whereClause.price = {};
+          if (params.minPrice !== undefined) whereClause.price.gte = params.minPrice;
+          if (params.maxPrice !== undefined) whereClause.price.lte = params.maxPrice;
+        }
+        if (params.rating !== undefined) {
+          whereClause.rating = { gte: params.rating };
+        }
+
+        let orderBy: any = { createdAt: "desc" };
+        if (params.sort === "price-asc") orderBy = { price: "asc" };
+        else if (params.sort === "price-desc") orderBy = { price: "desc" };
+        else if (params.sort === "rating") orderBy = { rating: "desc" };
+        else if (params.sort === "popular") orderBy = { reviewCount: "desc" };
+
+        const limit = params.limit || 24;
+        const page = params.page || 1;
 
         const [items, count] = await Promise.all([
           prisma.product.findMany({
@@ -40,24 +141,29 @@ export const productService = {
             include: {
               images: { orderBy: { displayOrder: "asc" } },
               variants: true,
-              store: true,
+              store: {
+                include: { sellerProfile: true },
+              },
               category: true,
+              inventories: true,
             },
-            take: params.limit || 24,
-            skip: ((params.page || 1) - 1) * (params.limit || 24),
+            orderBy,
+            take: limit,
+            skip: (page - 1) * limit,
           }),
           prisma.product.count({ where: whereClause }),
         ]);
 
-        if (items.length > 0) {
+        if (items && items.length > 0) {
           return {
-            products: items as unknown as Product[],
+            products: items.map(mapPrismaProduct),
             total: count,
           };
         }
       }
-    } catch {
-      // Silently fall back to in-memory store
+    } catch (error) {
+      // Gracefully fall back to local store
+      console.warn("Neon PostgreSQL product query fallback:", error);
     }
 
     // Fallback: In-memory store
@@ -116,43 +222,134 @@ export const productService = {
       filtered.sort((a, b) => b.reviewCount - a.reviewCount);
     }
 
+    const total = filtered.length;
+    const page = params.page || 1;
+    const limit = params.limit || 24;
+    const paginated = filtered.slice((page - 1) * limit, page * limit);
+
     return {
-      products: filtered,
-      total: filtered.length,
+      products: paginated,
+      total,
     };
   },
 
   async getProductBySlug(slug: string): Promise<Product | null> {
     try {
       if (process.env.DATABASE_URL && process.env.NEXT_PUBLIC_USE_MOCK_FALLBACK !== "true") {
-        const product = await prisma.product.findUnique({
+        const item = await prisma.product.findUnique({
           where: { slug },
           include: {
             images: { orderBy: { displayOrder: "asc" } },
             variants: true,
-            store: true,
+            store: {
+              include: { sellerProfile: true },
+            },
             category: true,
+            inventories: true,
             reviews: {
               include: { user: true },
               orderBy: { createdAt: "desc" },
             },
           },
         });
-        if (product) return product as unknown as Product;
+        if (item) return mapPrismaProduct(item);
       }
-    } catch {
-      // Fallback
+    } catch (error) {
+      console.warn("Neon PostgreSQL product by slug fallback:", error);
     }
 
     return localProducts.find((p) => p.slug === slug) || null;
   },
 
   async getProductById(id: string): Promise<Product | null> {
+    try {
+      if (process.env.DATABASE_URL && process.env.NEXT_PUBLIC_USE_MOCK_FALLBACK !== "true") {
+        const item = await prisma.product.findUnique({
+          where: { id },
+          include: {
+            images: { orderBy: { displayOrder: "asc" } },
+            variants: true,
+            store: {
+              include: { sellerProfile: true },
+            },
+            category: true,
+            inventories: true,
+          },
+        });
+        if (item) return mapPrismaProduct(item);
+      }
+    } catch {
+      // Fallback
+    }
+
     return localProducts.find((p) => p.id === id) || null;
   },
 
-  async getProductsBySeller(sellerId: string): Promise<Product[]> {
-    return localProducts.filter((p) => p.sellerId === sellerId);
+  async getProductsBySeller(sellerSlugOrId: string): Promise<Product[]> {
+    try {
+      if (process.env.DATABASE_URL && process.env.NEXT_PUBLIC_USE_MOCK_FALLBACK !== "true") {
+        const items = await prisma.product.findMany({
+          where: {
+            OR: [
+              { storeId: sellerSlugOrId },
+              { store: { slug: sellerSlugOrId } },
+            ],
+            status: "ACTIVE",
+          },
+          include: {
+            images: { orderBy: { displayOrder: "asc" } },
+            variants: true,
+            store: {
+              include: { sellerProfile: true },
+            },
+            category: true,
+            inventories: true,
+          },
+        });
+        if (items && items.length > 0) {
+          return items.map(mapPrismaProduct);
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
+    return localProducts.filter(
+      (p) => p.sellerId === sellerSlugOrId || p.seller?.slug === sellerSlugOrId
+    );
+  },
+
+  async getRelatedProducts(productId: string, categoryId: string, limit = 4): Promise<Product[]> {
+    try {
+      if (process.env.DATABASE_URL && process.env.NEXT_PUBLIC_USE_MOCK_FALLBACK !== "true") {
+        const items = await prisma.product.findMany({
+          where: {
+            categoryId,
+            id: { not: productId },
+            status: "ACTIVE",
+          },
+          include: {
+            images: { orderBy: { displayOrder: "asc" } },
+            variants: true,
+            store: {
+              include: { sellerProfile: true },
+            },
+            category: true,
+            inventories: true,
+          },
+          take: limit,
+        });
+        if (items && items.length > 0) {
+          return items.map(mapPrismaProduct);
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
+    return localProducts
+      .filter((p) => p.categoryId === categoryId && p.id !== productId)
+      .slice(0, limit);
   },
 
   async createProduct(data: {

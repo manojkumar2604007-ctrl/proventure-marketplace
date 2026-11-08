@@ -77,7 +77,7 @@ export function SearchBar({
     if (onSearchSubmit) {
       onSearchSubmit(term);
     } else {
-      router.push(`/products?search=${encodeURIComponent(term)}`);
+      router.push(`/search?q=${encodeURIComponent(term)}`);
     }
   };
 

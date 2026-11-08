@@ -22,8 +22,8 @@ export function CategoryGrid({ categories }: CategoryGridProps) {
             </h2>
           </div>
           <Link
-            href="/products"
-            className="text-xs sm:text-sm font-semibold text-primary hover:underline flex items-center gap-1"
+            href="/categories"
+            className="text-xs sm:text-sm font-semibold text-secondary hover:underline flex items-center gap-1"
           >
             All Categories <ArrowRight className="h-4 w-4" />
           </Link>
@@ -33,7 +33,7 @@ export function CategoryGrid({ categories }: CategoryGridProps) {
           {categories.map((cat) => (
             <Link
               key={cat.id}
-              href={`/products?category=${cat.slug}`}
+              href={`/categories/${cat.slug}`}
               className="group relative rounded-2xl overflow-hidden aspect-[3/4] bg-muted border shadow-sm hover:shadow-lg transition-all"
             >
               <Image

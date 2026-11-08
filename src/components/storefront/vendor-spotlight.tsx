@@ -93,11 +93,11 @@ export function VendorSpotlight({ vendors }: VendorSpotlightProps) {
                   </div>
 
                   <Link
-                    href={`/products?seller=${vendor.slug}`}
-                    className="font-semibold text-primary hover:underline flex items-center gap-1"
+                    href={`/stores/${vendor.slug}`}
+                    className="font-semibold text-secondary hover:underline flex items-center gap-1"
                   >
                     <Store className="h-3.5 w-3.5" />
-                    <span>Browse Shop</span>
+                    <span>Visit Store</span>
                   </Link>
                 </div>
               </div>

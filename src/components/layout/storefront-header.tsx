@@ -161,15 +161,15 @@ export function StorefrontHeader() {
         <div className="container py-2 flex items-center justify-between text-xs">
           <div className="flex items-center gap-6 font-medium text-muted-foreground">
             <Link
-              href="/products"
+              href="/categories"
               className="text-primary font-bold hover:text-secondary transition-colors"
             >
-              All Departments
+              All Categories
             </Link>
             {navCategories.map((cat) => (
               <Link
                 key={cat.slug}
-                href={`/products?category=${cat.slug}`}
+                href={`/categories/${cat.slug}`}
                 className="hover:text-primary transition-colors"
               >
                 {cat.name}
@@ -199,19 +199,19 @@ export function StorefrontHeader() {
 
           <div className="flex flex-col gap-1.5 pt-2 border-t border-border/60">
             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-              Departments
+              Departments &amp; Categories
             </span>
             <Link
-              href="/products"
+              href="/categories"
               onClick={closeMobileMenu}
               className="text-sm font-semibold text-primary py-1.5 hover:text-secondary"
             >
-              All Products
+              All Categories
             </Link>
             {navCategories.map((cat) => (
               <Link
                 key={cat.slug}
-                href={`/products?category=${cat.slug}`}
+                href={`/categories/${cat.slug}`}
                 onClick={closeMobileMenu}
                 className="text-sm text-muted-foreground hover:text-foreground py-1"
               >

@@ -90,10 +90,14 @@ export function ProductCard({ product, layout = "grid" }: ProductCardProps) {
         <div className="flex flex-1 flex-col justify-between p-5">
           <div>
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-              <span className="flex items-center gap-1 font-medium hover:text-secondary transition-colors">
+              <Link
+                href={`/stores/${product.seller?.slug || "store"}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1 font-medium hover:text-secondary transition-colors"
+              >
                 <CheckCircle2 className="h-3 w-3 text-accent" />
                 {product.seller?.storeName || "Verified Vendor"}
-              </span>
+              </Link>
               {product.rating > 0 && (
                 <div className="flex items-center gap-1 font-semibold text-amber-500">
                   <Star className="h-3.5 w-3.5 fill-current" />
@@ -212,9 +216,13 @@ export function ProductCard({ product, layout = "grid" }: ProductCardProps) {
         <div>
           {/* Seller / Store name */}
           <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
-            <span className="truncate hover:text-secondary transition-colors font-medium">
+            <Link
+              href={`/stores/${product.seller?.slug || "store"}`}
+              onClick={(e) => e.stopPropagation()}
+              className="truncate hover:text-secondary transition-colors font-medium max-w-[140px]"
+            >
               {product.seller?.storeName || "Verified Vendor"}
-            </span>
+            </Link>
             {product.rating > 0 && (
               <div className="flex items-center gap-1 font-semibold text-amber-500">
                 <Star className="h-3 w-3 fill-current" />
