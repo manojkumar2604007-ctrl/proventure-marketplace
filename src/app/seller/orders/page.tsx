@@ -1,14 +1,35 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { orderService } from "@/services/order.service";
 import { Order, OrderStatus } from "@/types";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { useUIStore } from "@/store/ui-store";
-import { Package, Truck, CheckCircle2, Search, Filter } from "lucide-react";
+import {
+  Package,
+  Truck,
+  CheckCircle2,
+  Search,
+  Filter,
+  ArrowRight,
+  Clock,
+  RotateCcw,
+  XCircle,
+  ExternalLink,
+} from "lucide-react";
+
+const COURIER_CARRIERS = [
+  "Blue Dart Express",
+  "Delhivery",
+  "DTDC Logistics",
+  "Ekart Logistics",
+  "India Post Speed Post",
+];
 
 export default function SellerOrdersPage() {
   const sellerId = "seller_technexus";
@@ -18,6 +39,16 @@ export default function SellerOrdersPage() {
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [search, setSearch] = useState("");
 
+  // Shipping Modal State
+  const [shippingCandidate, setShippingCandidate] = useState<{
+    orderId: string;
+    itemId: string;
+    itemTitle: string;
+  } | null>(null);
+  const [carrier, setCarrier] = useState(COURIER_CARRIERS[0]);
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -26,7 +57,7 @@ export default function SellerOrdersPage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [sellerId]);
 
   const handleUpdateStatus = async (
     orderId: string,
@@ -43,11 +74,34 @@ export default function SellerOrdersPage() {
     if (updated) {
       setOrders(orders.map((o) => (o.id === orderId ? updated : o)));
       addToast({
-        title: "Fulfillment Updated",
+        title: "Fulfillment Status Updated",
         description: `Order item marked as ${newStatus}.`,
         type: "success",
       });
     }
+  };
+
+  const handleDispatchOrder = async () => {
+    if (!shippingCandidate) return;
+    if (!trackingNumber) {
+      addToast({
+        title: "Missing Tracking Number",
+        description: "Please specify the Courier Airway Bill (AWB) number.",
+        type: "error",
+      });
+      return;
+    }
+
+    setIsUpdating(true);
+    await handleUpdateStatus(
+      shippingCandidate.orderId,
+      shippingCandidate.itemId,
+      "SHIPPED",
+      `${carrier} — ${trackingNumber}`
+    );
+    setIsUpdating(false);
+    setShippingCandidate(null);
+    setTrackingNumber("");
   };
 
   const filtered = orders.filter((o) => {
@@ -64,62 +118,74 @@ export default function SellerOrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-foreground tracking-tight">
-          Order Fulfillment Management
-        </h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Process customer orders, assign courier airway bills, and mark dispatches
-        </p>
+      {/* Page Title */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-foreground tracking-tight">
+            Order Fulfillment Pipeline
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Process customer orders, allocate courier airway bills, and coordinate logistics dispatches
+          </p>
+        </div>
       </div>
 
-      {/* Filters and search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:w-72">
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-2xl border border-border/80 shadow-sm">
+        <div className="relative flex-1 w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search by Order # or Customer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-xl border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full pl-9 pr-3 py-2 rounded-xl border border-border/80 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
 
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-muted-foreground">Status:</span>
-          {["ALL", "PROCESSING", "SHIPPED", "DELIVERED"].map((st) => (
-            <button
-              key={st}
-              onClick={() => setFilterStatus(st)}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                filterStatus === st
-                  ? "bg-primary text-white font-bold"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {st}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto text-xs pb-1 sm:pb-0">
+          <span className="text-muted-foreground text-xs font-medium mr-1">Status:</span>
+          {["ALL", "PENDING", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"].map(
+            (st) => (
+              <button
+                key={st}
+                onClick={() => setFilterStatus(st)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                  filterStatus === st
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-surface hover:bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {st}
+              </button>
+            )
+          )}
         </div>
       </div>
 
-      {/* Orders List */}
+      {/* Orders List / Cards */}
       <div className="space-y-4">
-        {filtered.map((order) => {
-          const sellerItems = order.items.filter((i) => i.sellerId === sellerId);
-          const sellerTotal = sellerItems.reduce((acc, i) => acc + i.total, 0);
+        {filtered.length === 0 ? (
+          <div className="border border-border/80 rounded-2xl bg-card p-12 text-center text-muted-foreground">
+            <Package className="h-10 w-10 mx-auto text-muted-foreground/60 mb-2" />
+            <p className="font-bold text-foreground">No orders match the selected criteria.</p>
+            <p className="text-xs text-muted-foreground mt-1">Try switching status filters or clearing the search query.</p>
+          </div>
+        ) : (
+          filtered.map((order) => {
+            const sellerItems = order.items.filter((i) => i.sellerId === sellerId);
+            const sellerTotal = sellerItems.reduce((acc, it) => acc + it.total, 0);
 
-          return (
-            <div
-              key={order.id}
-              className="border rounded-2xl bg-card overflow-hidden shadow-sm p-6 space-y-4"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-sm text-foreground font-mono">
-                      Order #{order.orderNumber}
+            return (
+              <div
+                key={order.id}
+                className="border border-border/80 rounded-2xl bg-card p-6 shadow-sm space-y-4 hover:border-primary/40 transition-colors"
+              >
+                {/* Order Top Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-border/60 gap-2">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-bold text-sm text-primary">
+                      {order.orderNumber}
                     </span>
                     <Badge
                       variant={
@@ -127,106 +193,203 @@ export default function SellerOrdersPage() {
                           ? "success"
                           : order.status === "SHIPPED"
                           ? "info"
+                          : order.status === "CANCELLED"
+                          ? "destructive"
                           : "warning"
                       }
                       className="text-[10px]"
                     >
                       {order.status}
                     </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Placed: {formatDate(order.createdAt)}
+                    </span>
                   </div>
-                  <span className="text-xs text-muted-foreground mt-0.5 block">
-                    Customer: {order.shippingAddress.fullName} • Placed {formatDate(order.createdAt)}
-                  </span>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground">
+                      Seller Share: <strong className="text-foreground">{formatPrice(sellerTotal)}</strong>
+                    </span>
+                    <Link href={`/seller/orders/${order.id}`}>
+                      <Button variant="outline" size="sm" className="text-xs h-7 gap-1 font-bold">
+                        <span>Full Details</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
 
-                <div className="text-left sm:text-right">
-                  <span className="text-sm font-black text-foreground">
-                    Your Share: {formatPrice(sellerTotal)}
-                  </span>
-                  <span className="text-[11px] text-emerald-600 block font-semibold">
-                    Net Payout: {formatPrice(Math.round(sellerTotal * 0.9))}
-                  </span>
+                {/* Customer Address Snapshot */}
+                <div className="text-xs text-muted-foreground bg-surface/50 p-3 rounded-xl border border-border/40 flex flex-col sm:flex-row justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-foreground block">
+                      Delivery Destination: {order.shippingAddress.fullName}
+                    </span>
+                    <span>
+                      {order.shippingAddress.street}, {order.shippingAddress.city},{" "}
+                      {order.shippingAddress.state} - {order.shippingAddress.postalCode}
+                    </span>
+                  </div>
+                  <div className="text-right sm:text-right">
+                    <span className="font-medium text-foreground block">
+                      Phone: {order.shippingAddress.phone}
+                    </span>
+                    <span>Payment: <strong className="text-emerald-600">{order.paymentStatus}</strong></span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Items Table */}
-              <div className="space-y-3">
-                {sellerItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl bg-muted/20 border text-xs"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                        <Package className="h-5 w-5" />
-                      </div>
+                {/* Line Items for this Seller */}
+                <div className="divide-y divide-border/40">
+                  {sellerItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="pt-3 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
+                    >
                       <div>
-                        <h4 className="font-bold text-foreground">{item.title}</h4>
-                        {item.variantName && (
-                          <p className="text-muted-foreground text-[11px]">
-                            {item.variantName}
+                        <p className="font-bold text-foreground text-sm">{item.title}</p>
+                        <p className="text-muted-foreground">
+                          Qty: <span className="font-bold text-foreground">{item.quantity}</span> × {formatPrice(item.price)}
+                          {item.variantName && ` • Variant: ${item.variantName}`}
+                        </p>
+                        {item.trackingNumber && (
+                          <p className="text-[11px] font-mono text-primary mt-0.5">
+                            AWB: {item.trackingNumber}
                           </p>
                         )}
-                        <p className="text-muted-foreground text-[11px]">
-                          Qty: {item.quantity} × {formatPrice(item.price)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Actions and tracking */}
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                          Current Status
-                        </span>
-                        <select
-                          value={item.fulfillmentStatus}
-                          onChange={(e) =>
-                            handleUpdateStatus(
-                              order.id,
-                              item.id,
-                              e.target.value as OrderStatus,
-                              item.trackingNumber || `TRK-EXP-${Math.floor(10000 + Math.random() * 90000)}`
-                            )
-                          }
-                          className="bg-background border rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
-                        >
-                          <option value="PROCESSING">Processing</option>
-                          <option value="SHIPPED">Shipped</option>
-                          <option value="DELIVERED">Delivered</option>
-                          <option value="CANCELLED">Cancelled</option>
-                        </select>
                       </div>
 
-                      {item.trackingNumber && (
-                        <div className="p-2 rounded-lg bg-muted border font-mono text-[11px]">
-                          <span className="text-muted-foreground block text-[9px] uppercase font-bold">
-                            Airway Bill
-                          </span>
-                          <span className="font-bold text-primary">
-                            {item.trackingNumber}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      {/* Fulfillment Actions */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {item.fulfillmentStatus === "PENDING" && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleUpdateStatus(order.id, item.id, "CONFIRMED")}
+                            className="text-xs h-8 font-bold"
+                          >
+                            Accept Order
+                          </Button>
+                        )}
 
-              {/* Delivery destination */}
-              <div className="pt-2 text-xs text-muted-foreground flex items-center justify-between border-t">
-                <span>
-                  Ship To: {order.shippingAddress.street}, {order.shippingAddress.city} (
-                  {order.shippingAddress.postalCode})
-                </span>
-                <span className="font-semibold text-foreground">
-                  Contact: {order.shippingAddress.phone}
-                </span>
+                        {item.fulfillmentStatus === "CONFIRMED" && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleUpdateStatus(order.id, item.id, "PROCESSING")}
+                            className="text-xs h-8 font-bold"
+                          >
+                            Mark In Packaging
+                          </Button>
+                        )}
+
+                        {item.fulfillmentStatus === "PROCESSING" && (
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              setShippingCandidate({
+                                orderId: order.id,
+                                itemId: item.id,
+                                itemTitle: item.title,
+                              })
+                            }
+                            className="text-xs h-8 font-bold gap-1.5"
+                          >
+                            <Truck className="h-3.5 w-3.5" />
+                            <span>Assign Courier & Ship</span>
+                          </Button>
+                        )}
+
+                        {item.fulfillmentStatus === "SHIPPED" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleUpdateStatus(order.id, item.id, "DELIVERED")}
+                            className="text-xs h-8 font-bold text-emerald-600 border-emerald-500/30 hover:bg-emerald-50"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                            <span>Confirm Delivery</span>
+                          </Button>
+                        )}
+
+                        {item.fulfillmentStatus === "DELIVERED" && (
+                          <Badge variant="success" className="text-xs font-bold py-1">
+                            Delivered Successfully
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
+
+      {/* Dispatch & Shipping Modal */}
+      <Modal
+        isOpen={Boolean(shippingCandidate)}
+        onClose={() => setShippingCandidate(null)}
+        title="Dispatch Order & Assign Courier"
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-xl bg-surface/80 border border-border/60 text-xs">
+            <span className="font-bold text-foreground block">
+              {shippingCandidate?.itemTitle}
+            </span>
+            <span className="text-muted-foreground">
+              Please enter official tracking info for customer real-time tracking.
+            </span>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-foreground block mb-1">
+              Logistics Courier Partner
+            </label>
+            <select
+              value={carrier}
+              onChange={(e) => setCarrier(e.target.value)}
+              className="w-full h-9 rounded-xl border border-border/80 bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+            >
+              {COURIER_CARRIERS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-foreground block mb-1">
+              Courier Airway Bill (AWB) / Tracking Number
+            </label>
+            <Input
+              value={trackingNumber}
+              onChange={(e) => setTrackingNumber(e.target.value)}
+              placeholder="e.g. BLUEDART-8829102"
+              className="text-xs h-9 font-mono"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/60">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShippingCandidate(null)}
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleDispatchOrder}
+              disabled={isUpdating}
+              className="font-bold"
+            >
+              {isUpdating ? "Dispatching..." : "Confirm Shipment"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
