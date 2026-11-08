@@ -3,19 +3,21 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Star, ShoppingBag, Heart } from "lucide-react";
+import { Star, ShoppingBag, Heart, CheckCircle2 } from "lucide-react";
 import { Product } from "@/types";
 import { formatPrice, calculateDiscount } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/store/cart-store";
 import { useWishlistStore } from "@/store/wishlist-store";
 import { useUIStore } from "@/store/ui-store";
 
 interface ProductCardProps {
   product: Product;
+  layout?: "grid" | "list";
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, layout = "grid" }: ProductCardProps) {
   const addItem = useCartStore((state) => state.addItem);
   const { toggleItem, isInWishlist } = useWishlistStore();
   const { addToast, openCart } = useUIStore();
@@ -45,7 +47,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
     addToast({
       title: "Added to Cart",
-      description: `${product.title} has been placed in your cart.`,
+      description: `${product.title} has been added to your shopping bag.`,
       type: "success",
     });
 
@@ -57,35 +59,122 @@ export function ProductCard({ product }: ProductCardProps) {
     e.stopPropagation();
     toggleItem(product);
     addToast({
-      title: isWishlisted ? "Removed from Wishlist" : "Added to Wishlist",
+      title: isWishlisted ? "Removed from Wishlist" : "Saved to Wishlist",
       description: product.title,
       type: "default",
     });
   };
 
+  if (layout === "list") {
+    return (
+      <div className="group relative flex flex-col sm:flex-row rounded-xl border border-border/70 bg-card overflow-hidden shadow-subtle hover:shadow-card transition-all duration-200">
+        <div className="relative aspect-video sm:aspect-square sm:w-56 shrink-0 bg-surface">
+          <Link href={`/products/${product.slug}`} className="block h-full w-full">
+            <Image
+              src={primaryImage}
+              alt={product.title}
+              fill
+              sizes="(max-width: 640px) 100vw, 224px"
+              className="object-cover transition-transform duration-300 group-hover:scale-102"
+            />
+          </Link>
+          {discountPercent > 0 && (
+            <div className="absolute top-2.5 left-2.5 pointer-events-none">
+              <Badge variant="accent" size="sm" className="shadow-subtle">
+                Save {discountPercent}%
+              </Badge>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-1 flex-col justify-between p-5">
+          <div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+              <span className="flex items-center gap-1 font-medium hover:text-secondary transition-colors">
+                <CheckCircle2 className="h-3 w-3 text-accent" />
+                {product.seller?.storeName || "Verified Vendor"}
+              </span>
+              {product.rating > 0 && (
+                <div className="flex items-center gap-1 font-semibold text-amber-500">
+                  <Star className="h-3.5 w-3.5 fill-current" />
+                  <span>{product.rating.toFixed(1)}</span>
+                  <span className="text-muted-foreground font-normal">
+                    ({product.reviewCount})
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <Link href={`/products/${product.slug}`}>
+              <h3 className="font-bold text-base text-primary hover:text-secondary transition-colors line-clamp-1">
+                {product.title}
+              </h3>
+            </Link>
+            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+              {product.description}
+            </p>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="text-lg font-extrabold text-primary">
+                {formatPrice(product.price)}
+              </span>
+              {product.comparePrice && product.comparePrice > product.price && (
+                <span className="text-xs text-muted-foreground line-through">
+                  {formatPrice(product.comparePrice)}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={handleWishlistToggle}
+                className={isWishlisted ? "text-rose-500 border-rose-200" : ""}
+                aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+              >
+                <Heart className={`h-4 w-4 ${isWishlisted ? "fill-current" : ""}`} />
+              </Button>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={handleAddToCart}
+                leftIcon={<ShoppingBag className="h-3.5 w-3.5" />}
+              >
+                Add to Cart
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="group relative flex flex-col rounded-2xl border bg-card overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+    <div className="group relative flex flex-col rounded-xl border border-border/80 bg-card overflow-hidden shadow-subtle hover:shadow-card transition-all duration-200">
       {/* Image Container */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted/30">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface">
         <Link href={`/products/${product.slug}`} className="block h-full w-full">
           <Image
             src={primaryImage}
             alt={product.title}
             fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-103"
           />
         </Link>
 
         {/* Badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10 pointer-events-none">
+        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10 pointer-events-none">
           {discountPercent > 0 && (
-            <Badge variant="destructive" className="font-bold text-[11px] px-2 shadow-sm">
+            <Badge variant="accent" size="sm" className="shadow-subtle">
               Save {discountPercent}%
             </Badge>
           )}
           {product.featured && (
-            <Badge variant="default" className="font-semibold text-[11px] px-2 shadow-sm bg-indigo-600">
+            <Badge variant="secondary" size="sm" className="shadow-subtle">
               Featured
             </Badge>
           )}
@@ -94,10 +183,10 @@ export function ProductCard({ product }: ProductCardProps) {
         {/* Wishlist Button */}
         <button
           onClick={handleWishlistToggle}
-          className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 z-10 ${
+          className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md transition-all duration-200 z-10 ${
             isWishlisted
-              ? "bg-rose-500 text-white shadow-md"
-              : "bg-white/80 dark:bg-black/60 text-muted-foreground hover:text-rose-500 hover:bg-white"
+              ? "bg-rose-500 text-white shadow-subtle"
+              : "bg-white/85 text-muted-foreground hover:text-rose-600 hover:bg-white shadow-subtle"
           }`}
           aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
         >
@@ -105,14 +194,16 @@ export function ProductCard({ product }: ProductCardProps) {
         </button>
 
         {/* Quick Add Button overlay on hover */}
-        <div className="absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <button
+        <div className="absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hidden sm:block">
+          <Button
+            size="sm"
+            variant="default"
             onClick={handleAddToCart}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-foreground text-background text-xs font-semibold shadow-lg hover:opacity-95 transition-all"
+            className="w-full shadow-dropdown text-xs font-semibold"
+            leftIcon={<ShoppingBag className="h-3.5 w-3.5" />}
           >
-            <ShoppingBag className="h-3.5 w-3.5" />
-            <span>Quick Add</span>
-          </button>
+            Quick Add
+          </Button>
         </div>
       </div>
 
@@ -121,7 +212,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <div>
           {/* Seller / Store name */}
           <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
-            <span className="truncate hover:text-primary transition-colors font-medium">
+            <span className="truncate hover:text-secondary transition-colors font-medium">
               {product.seller?.storeName || "Verified Vendor"}
             </span>
             {product.rating > 0 && (
@@ -137,28 +228,28 @@ export function ProductCard({ product }: ProductCardProps) {
 
           {/* Product Title */}
           <Link href={`/products/${product.slug}`}>
-            <h3 className="font-semibold text-sm text-foreground line-clamp-2 hover:text-primary transition-colors leading-snug">
+            <h3 className="font-semibold text-sm text-primary hover:text-secondary transition-colors line-clamp-2 leading-snug">
               {product.title}
             </h3>
           </Link>
         </div>
 
         {/* Pricing & Stock */}
-        <div className="mt-3 pt-3 border-t flex items-center justify-between">
-          <div className="flex items-baseline gap-2">
-            <span className="text-base font-extrabold text-foreground">
+        <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-sm font-extrabold text-primary">
               {formatPrice(product.price)}
             </span>
             {product.comparePrice && product.comparePrice > product.price && (
-              <span className="text-xs text-muted-foreground line-through">
+              <span className="text-[11px] text-muted-foreground line-through">
                 {formatPrice(product.comparePrice)}
               </span>
             )}
           </div>
 
           <span
-            className={`text-[11px] font-medium ${
-              product.stock > 0 ? "text-emerald-600" : "text-rose-500"
+            className={`text-[11px] font-semibold ${
+              product.stock > 0 ? "text-accent" : "text-destructive"
             }`}
           >
             {product.stock > 0 ? "In Stock" : "Sold Out"}

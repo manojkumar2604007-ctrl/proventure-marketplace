@@ -4,65 +4,80 @@
 
 @layer base {
   :root {
+    /* Background: Pure White */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Text: Dark Charcoal (#0F172A) */
+    --foreground: 222 47% 11%;
 
+    /* Surface: Light Gray (#F8FAFC) */
+    --surface: 210 40% 98%;
+
+    /* Card: Crisp White with Light Gray Surface */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
 
+    /* Popovers & Menus */
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 238.7 83.5% 58.6%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary: Deep Navy (#0A192F) */
+    --primary: 218 65% 11%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary: Royal Blue (#1D4ED8 / #2563EB) */
+    --secondary: 221 83% 53%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Accent: Emerald Green (#059669 / #10B981) */
+    --accent: 160 84% 39%;
+    --accent-foreground: 0 0% 100%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Muted / Neutral Grays */
+    --muted: 214 32% 93%;
+    --muted-foreground: 215 16% 47%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Destructive: Crimson Rose */
+    --destructive: 350 84% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 238.7 83.5% 58.6%;
+    /* Borders & Inputs */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
 
-    --radius: 0.75rem;
+    --radius: 0.625rem;
   }
 
   .dark {
-    --background: 224 71.4% 4.1%;
+    --background: 222 47% 7%;
     --foreground: 210 40% 98%;
 
-    --card: 224 71.4% 6.9%;
+    --surface: 222 47% 10%;
+
+    --card: 222 47% 9%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 224 71.4% 6.9%;
+    --popover: 222 47% 9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 238.7 83.5% 66.7%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 218 65% 15%;
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 221 83% 60%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 160 84% 45%;
+    --accent-foreground: 0 0% 100%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --muted: 217 33% 18%;
+    --muted-foreground: 215 20% 65%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 350 63% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 238.7 83.5% 66.7%;
+    --border: 217 33% 18%;
+    --input: 217 33% 18%;
+    --ring: 221 83% 60%;
   }
 }
 
@@ -70,48 +85,92 @@
   * {
     @apply border-border;
   }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    @apply bg-background text-foreground antialiased selection:bg-secondary/15 selection:text-secondary;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Accessible focus indicators */
+  :focus-visible {
+    @apply outline-none ring-2 ring-secondary ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Typography styles */
+@layer components {
+  .heading-display {
+    @apply text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-primary;
+  }
+  
+  .heading-1 {
+    @apply text-2xl sm:text-3xl font-bold tracking-tight text-primary;
+  }
+
+  .heading-2 {
+    @apply text-xl sm:text-2xl font-bold tracking-tight text-primary;
+  }
+
+  .heading-3 {
+    @apply text-lg sm:text-xl font-semibold tracking-tight text-primary;
+  }
+
+  .subheading {
+    @apply text-sm sm:text-base text-muted-foreground font-normal;
+  }
+
+  .body-default {
+    @apply text-sm leading-relaxed text-foreground;
+  }
+
+  .caption {
+    @apply text-xs font-medium text-muted-foreground;
   }
 }
 
 /* Custom scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.2);
+  background: hsl(var(--muted-foreground) / 0.25);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.4);
+  background: hsl(var(--muted-foreground) / 0.45);
 }
 
-/* Smooth transitions */
+/* Subtle transitions */
 .transition-smooth {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Glassmorphism */
 .glass {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 .dark .glass {
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(10, 25, 47, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
-/* Subtle gradient mesh for hero and cards */
-.hero-gradient {
-  background: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
-              radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
-              radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.05) 0%, transparent 50%);
+/* Subtle premium gradient for Hero & Showcase cards */
+.marketplace-mesh {
+  background-image: 
+    radial-gradient(at 15% 15%, rgba(29, 78, 216, 0.08) 0px, transparent 50%),
+    radial-gradient(at 85% 85%, rgba(5, 150, 105, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(10, 25, 47, 0.03) 0px, transparent 50%);
 }
