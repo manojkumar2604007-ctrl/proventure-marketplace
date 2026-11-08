@@ -107,6 +107,9 @@ export const productService = {
         if (params.seller) {
           whereClause.store = { slug: params.seller };
         }
+        if (params.brand) {
+          whereClause.tags = { has: params.brand };
+        }
         if (params.search) {
           whereClause.OR = [
             { title: { contains: params.search, mode: "insensitive" } },
@@ -131,6 +134,7 @@ export const productService = {
         else if (params.sort === "price-desc") orderBy = { price: "desc" };
         else if (params.sort === "rating") orderBy = { rating: "desc" };
         else if (params.sort === "popular") orderBy = { reviewCount: "desc" };
+        else if (params.sort === "bestselling") orderBy = { reviewCount: "desc" };
 
         const limit = params.limit || 24;
         const page = params.page || 1;
@@ -211,6 +215,23 @@ export const productService = {
       filtered = filtered.filter((p) => p.stock > 0);
     }
 
+    if (params.brand) {
+      const b = params.brand.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.tags.some((t) => t.toLowerCase().includes(b)) ||
+          p.title.toLowerCase().includes(b)
+      );
+    }
+
+    if (params.discount) {
+      filtered = filtered.filter((p) => {
+        if (!p.comparePrice || p.comparePrice <= p.price) return false;
+        const discountPct = Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100);
+        return discountPct >= params.discount!;
+      });
+    }
+
     // Sort
     if (params.sort === "price-asc") {
       filtered.sort((a, b) => a.price - b.price);
@@ -220,6 +241,10 @@ export const productService = {
       filtered.sort((a, b) => b.rating - a.rating);
     } else if (params.sort === "popular") {
       filtered.sort((a, b) => b.reviewCount - a.reviewCount);
+    } else if (params.sort === "bestselling") {
+      filtered.sort((a, b) => (b.reviewCount * (b.rating || 1)) - (a.reviewCount * (a.rating || 1)));
+    } else if (params.sort === "newest") {
+      filtered.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     }
 
     const total = filtered.length;

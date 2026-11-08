@@ -115,14 +115,45 @@ export interface ProductFilterParams {
   category?: string;
   seller?: string;
   search?: string;
+  brand?: string;
   minPrice?: number;
   maxPrice?: number;
   rating?: number;
-  sort?: "newest" | "price-asc" | "price-desc" | "rating" | "popular";
+  discount?: number;
+  sort?: "newest" | "price-asc" | "price-desc" | "rating" | "popular" | "bestselling";
   featured?: boolean;
   inStock?: boolean;
   page?: number;
   limit?: number;
+}
+
+export interface SearchAutocompleteResult {
+  query: string;
+  suggestions: string[];
+  products: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    price: number;
+    comparePrice?: number | null;
+    image: string;
+    categoryName?: string;
+    sellerName?: string;
+    rating?: number;
+  }>;
+  categories: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    productCount?: number;
+  }>;
+  sellers: Array<{
+    id: string;
+    storeName: string;
+    slug: string;
+    logo?: string | null;
+    rating?: number;
+  }>;
 }
 
 export interface CartItem {
@@ -209,6 +240,8 @@ export interface Review {
   id: string;
   productId: string;
   customerId: string;
+  orderId?: string | null;
+  orderItemId?: string | null;
   customer?: {
     name: string | null;
     image?: string | null;
@@ -219,6 +252,7 @@ export interface Review {
   verifiedPurchase: boolean;
   sellerResponse?: string | null;
   createdAt: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface Payout {

@@ -74,6 +74,9 @@ function ProductsContent() {
   const [minRating, setMinRating] = useState<number | undefined>(
     searchParams.get("rating") ? Number(searchParams.get("rating")) : undefined
   );
+  const [discountFilter, setDiscountFilter] = useState<number | undefined>(
+    searchParams.get("discount") ? Number(searchParams.get("discount")) : undefined
+  );
   const [inStockOnly, setInStockOnly] = useState(searchParams.get("inStock") === "true");
   const [sortOption, setSortOption] = useState<any>(searchParams.get("sort") || "newest");
   const [currentPage, setCurrentPage] = useState(1);
@@ -113,6 +116,7 @@ function ProductsContent() {
         minPrice,
         maxPrice,
         rating: minRating,
+        discount: discountFilter,
         sort: sortOption,
         inStock: inStockOnly || undefined,
         page: currentPage,
@@ -544,11 +548,12 @@ function ProductsContent() {
               }}
               className="h-9 text-xs"
               options={[
+                { value: "popular", label: "Most Popular" },
+                { value: "bestselling", label: "Best Selling" },
                 { value: "newest", label: "Newest Arrivals" },
+                { value: "rating", label: "Customer Rating" },
                 { value: "price-asc", label: "Price: Low to High" },
                 { value: "price-desc", label: "Price: High to Low" },
-                { value: "rating", label: "Customer Rating" },
-                { value: "popular", label: "Most Popular" },
               ]}
             />
           </div>

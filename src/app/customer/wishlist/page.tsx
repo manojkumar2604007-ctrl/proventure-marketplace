@@ -36,6 +36,7 @@ export default function CustomerWishlistPage() {
     });
 
     removeItem(product.id);
+    fetch(`/api/customer/wishlist?productId=${product.id}`, { method: "DELETE" }).catch(() => {});
 
     addToast({
       title: "Moved to Cart",
@@ -67,6 +68,11 @@ export default function CustomerWishlistPage() {
     });
 
     clearWishlist();
+    fetch("/api/customer/wishlist/move-to-cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ moveAll: true }),
+    }).catch(() => {});
 
     addToast({
       title: "All Items Moved to Cart",
