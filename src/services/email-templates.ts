@@ -538,7 +538,7 @@ export function generateSellerRejectionEmail(data: {
     </div>
 
     <p style="font-size: 13px; line-height: 1.6; color: #475569;">
-      Common reasons for application rejection include unverified GSTIN documents, missing company registration proofs, or brand catalog quality concerns. Once you have resolved the points above, we welcome you to update your profile and resubmit.
+      Common reasons for application rejection include incomplete store information, missing contact details, or brand catalog quality concerns. Once you have resolved the points above, we welcome you to update your profile and resubmit.
     </p>
 
     <div style="text-align: center; margin-top: 24px;">

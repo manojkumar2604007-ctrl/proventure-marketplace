@@ -151,7 +151,7 @@ export default async function StoreDetailPage({
               </div>
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-3.5 w-3.5 text-accent shrink-0" />
-                <span>GSTIN &amp; PAN Verified by ProVenture Compliance</span>
+                <span>Verified Merchant by ProVenture Compliance</span>
               </div>
             </div>
           </div>

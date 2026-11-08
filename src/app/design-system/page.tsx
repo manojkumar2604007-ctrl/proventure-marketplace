@@ -542,11 +542,10 @@ export default function DesignSystemPage() {
             />
 
             <Input
-              label="PAN Card / GST Number"
-              placeholder="29AAAAA0000A1Z5"
-              error="Please enter a valid 15-digit GSTIN identification number."
-              defaultValue="INVALID_GSTIN"
-              required
+              label="Business Identifier (Optional)"
+              placeholder="e.g. REG-109281"
+              error="Please enter a valid business registration code."
+              defaultValue="INVALID_CODE"
             />
 
             <FormField label="Fulfillment Hub Location" required>

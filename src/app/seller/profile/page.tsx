@@ -46,8 +46,6 @@ export default function SellerStoreProfilePage() {
   const [city, setCity] = useState("Bengaluru");
   const [state, setState] = useState("Karnataka");
   const [postalCode, setPostalCode] = useState("560100");
-  const [taxId, setTaxId] = useState("29ABCDE1234F1Z5"); // GSTIN
-  const [panNumber, setPanNumber] = useState("ABCDE1234F");
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,35 +268,12 @@ export default function SellerStoreProfilePage() {
           </div>
         </div>
 
-        {/* Legal & Taxation Verification */}
+        {/* Merchant Account Tier & Status */}
         <div className="p-6 rounded-2xl border border-border/80 bg-card space-y-4 shadow-sm">
           <h2 className="font-bold text-sm text-foreground flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-emerald-600" />
-            Merchant Tax & Verification Records
+            Merchant Verification & Account Tier
           </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-medium text-foreground block mb-1">
-                GSTIN / Tax Registration Number
-              </label>
-              <Input
-                value={taxId}
-                onChange={(e) => setTaxId(e.target.value)}
-                className="text-xs h-9 font-mono uppercase"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-foreground block mb-1">
-                Company PAN Number
-              </label>
-              <Input
-                value={panNumber}
-                onChange={(e) => setPanNumber(e.target.value)}
-                className="text-xs h-9 font-mono uppercase"
-              />
-            </div>
-          </div>
 
           <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-xs text-emerald-800">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />

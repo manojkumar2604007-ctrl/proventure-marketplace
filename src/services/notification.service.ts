@@ -100,7 +100,7 @@ const inMemoryNotifications: NotificationRecord[] = [
     id: "notif-adm-1",
     userId: "usr_admin_1",
     title: "New Merchant Application: Studio Clayworks",
-    message: "Artisanal ceramics brand has submitted GSTIN and merchant profile for review.",
+    message: "Artisanal ceramics brand has submitted store and merchant profile for review.",
     type: NotificationType.SYSTEM,
     read: false,
     data: { storeId: "store-new-3" },

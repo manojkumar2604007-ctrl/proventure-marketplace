@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
           {
             sellerName: name,
             storeName: "Unknown Retail",
-            reason: "GSTIN verification certificate did not match business trade name.",
+            reason: "Store catalog details did not meet marketplace quality standards.",
             appealUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/seller/register`,
           },
           false

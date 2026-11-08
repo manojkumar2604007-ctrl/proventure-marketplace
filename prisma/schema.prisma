@@ -176,7 +176,7 @@ model SellerProfile {
   businessName      String
   businessEmail     String
   businessPhone     String
-  taxId             String?      // GSTIN / VAT
+  taxId             String?      // Optional Business/Tax Reference
   panNumber         String?
   bankAccountName   String?
   bankAccountNumber String?

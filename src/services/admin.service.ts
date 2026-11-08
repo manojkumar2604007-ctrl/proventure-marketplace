@@ -82,7 +82,7 @@ let localAuditLogs: AdminAuditLog[] = [
     action: "VENDOR_APPROVED",
     entityType: "SellerProfile",
     entityId: "seller_technexus",
-    details: "Approved merchant TechNexus Innovations with verified GSTIN 29ABCDE1234F1Z5.",
+    details: "Approved merchant TechNexus Innovations following store profile verification.",
     timestamp: "Today, 08:30 AM",
     ipAddress: "192.168.1.1 (Admin HQ)",
   },

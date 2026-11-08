@@ -84,7 +84,7 @@ export default function SellerRegisterPage() {
           Application Received!
         </h1>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Welcome to the ProVenture merchant ecosystem. Our administrative team will verify your tax and business credentials within 24 hours.
+          Welcome to the ProVenture merchant ecosystem. Our administrative team will verify your store and business profile within 24 hours.
         </p>
         <div className="pt-2 flex justify-center gap-3">
           <Link href="/seller">
