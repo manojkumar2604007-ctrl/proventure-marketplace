@@ -6,14 +6,22 @@ export type ProductStatus = "DRAFT" | "ACTIVE" | "ARCHIVED" | "OUT_OF_STOCK";
 
 export type OrderStatus =
   | "PENDING"
-  | "PROCESSING"
   | "CONFIRMED"
+  | "PROCESSING"
   | "SHIPPED"
   | "DELIVERED"
   | "CANCELLED"
+  | "RETURN_REQUESTED"
+  | "RETURNED"
   | "REFUNDED";
 
-export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+export type PaymentStatus =
+  | "PENDING"
+  | "AUTHORIZED"
+  | "PAID"
+  | "FAILED"
+  | "REFUNDED"
+  | "PARTIALLY_REFUNDED";
 
 export type PayoutStatus = "PENDING" | "PROCESSING" | "PAID" | "FAILED";
 

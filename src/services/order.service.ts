@@ -1,6 +1,7 @@
 import { MOCK_ORDERS } from "@/lib/db/mock-data";
-import { Order, OrderItem, OrderStatus, ShippingAddress } from "@/types";
+import { Order, OrderItem, OrderStatus, PaymentStatus, ShippingAddress } from "@/types";
 import { generateOrderNumber } from "@/lib/utils";
+import { prisma } from "@/lib/db/prisma";
 
 let localOrders: Order[] = [...MOCK_ORDERS];
 const recordedPaymentIds = new Set<string>();
@@ -115,11 +116,103 @@ export const orderService = {
   },
 
   async updateOrderStatus(orderId: string, status: OrderStatus): Promise<Order | null> {
-    const index = localOrders.findIndex((o) => o.id === orderId);
+    const index = localOrders.findIndex((o) => o.id === orderId || o.orderNumber === orderId);
     if (index === -1) return null;
     localOrders[index].status = status;
     localOrders[index].updatedAt = new Date().toISOString();
     return localOrders[index];
+  },
+
+  async updatePaymentStatus(
+    orderIdOrNumber: string,
+    paymentStatus: PaymentStatus,
+    paymentDetails?: {
+      razorpayOrderId?: string;
+      razorpayPaymentId?: string;
+      razorpaySignature?: string;
+      method?: string;
+    }
+  ): Promise<Order | null> {
+    const index = localOrders.findIndex(
+      (o) => o.id === orderIdOrNumber || o.orderNumber === orderIdOrNumber
+    );
+
+    let updatedOrder: Order | null = null;
+    if (index > -1) {
+      localOrders[index].paymentStatus = paymentStatus;
+
+      // Ensure payment status and order status are managed separately with business logic
+      if (paymentStatus === "PAID") {
+        if (localOrders[index].status === "PENDING") {
+          localOrders[index].status = "CONFIRMED";
+        }
+      } else if (paymentStatus === "FAILED") {
+        localOrders[index].status = "CANCELLED";
+      } else if (paymentStatus === "REFUNDED") {
+        localOrders[index].status = "REFUNDED";
+      }
+
+      localOrders[index].updatedAt = new Date().toISOString();
+      updatedOrder = localOrders[index];
+    }
+
+    // Attempt Neon PostgreSQL persistence
+    try {
+      if (process.env.DATABASE_URL && process.env.NEXT_PUBLIC_USE_MOCK_FALLBACK !== "true") {
+        const dbOrder = await prisma.order.findFirst({
+          where: {
+            OR: [{ id: orderIdOrNumber }, { orderNumber: orderIdOrNumber }],
+          },
+        });
+
+        if (dbOrder) {
+          let newOrderStatus = dbOrder.status;
+          if (paymentStatus === "PAID" && dbOrder.status === "PENDING") {
+            newOrderStatus = "CONFIRMED";
+          } else if (paymentStatus === "FAILED") {
+            newOrderStatus = "CANCELLED";
+          } else if (paymentStatus === "REFUNDED") {
+            newOrderStatus = "REFUNDED";
+          }
+
+          await prisma.order.update({
+            where: { id: dbOrder.id },
+            data: {
+              paymentStatus: paymentStatus as any,
+              status: newOrderStatus as any,
+            },
+          });
+
+          if (paymentDetails?.razorpayPaymentId) {
+            await prisma.payment.upsert({
+              where: { orderId: dbOrder.id },
+              update: {
+                status: paymentStatus as any,
+                razorpayOrderId: paymentDetails.razorpayOrderId || undefined,
+                razorpayPaymentId: paymentDetails.razorpayPaymentId,
+                razorpaySignature: paymentDetails.razorpaySignature || undefined,
+                paidAt: paymentStatus === "PAID" ? new Date() : undefined,
+              },
+              create: {
+                orderId: dbOrder.id,
+                amount: dbOrder.total,
+                currency: "INR",
+                status: paymentStatus as any,
+                method: paymentDetails.method || "RAZORPAY",
+                razorpayOrderId: paymentDetails.razorpayOrderId || undefined,
+                razorpayPaymentId: paymentDetails.razorpayPaymentId,
+                razorpaySignature: paymentDetails.razorpaySignature || undefined,
+                paidAt: paymentStatus === "PAID" ? new Date() : undefined,
+              },
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("DB payment status update fallback:", err);
+    }
+
+    return updatedOrder;
   },
 
   async updateItemFulfillmentStatus(

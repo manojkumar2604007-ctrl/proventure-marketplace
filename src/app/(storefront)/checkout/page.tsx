@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCartStore } from "@/store/cart-store";
 import { useUIStore } from "@/store/ui-store";
-import { paymentService } from "@/services/payment.service";
 import { formatPrice } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,8 @@ import {
   Tag,
   AlertCircle,
   Package,
+  X,
+  AlertTriangle,
 } from "lucide-react";
 import { Order } from "@/types";
 
@@ -77,9 +79,19 @@ export default function CheckoutPage() {
   const [couponInput, setCouponInput] = useState("");
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
-  // Submission state
+  // Submission & Modal state
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
+  const [isRazorpaySdkLoaded, setIsRazorpaySdkLoaded] = useState(false);
+  
+  // Test / Simulation Modal for Offline & Sandbox validation
+  const [showSimulatedModal, setShowSimulatedModal] = useState(false);
+  const [pendingSimulatedData, setPendingSimulatedData] = useState<{
+    orderId: string;
+    amount: number;
+    receipt: string;
+    keyId: string;
+  } | null>(null);
 
   const subtotal = getSubtotal();
   const shippingFee = getShippingFee();
@@ -110,10 +122,9 @@ export default function CheckoutPage() {
           }
         }
       } catch {
-        // Fallback to manual entry
+        // Fallback
       }
 
-      // Default mock if none returned
       setFullName((session?.user?.name as string) || "Priya Sharma");
       setPhone("+91 91234 56789");
       setStreet("Flat 402, Oakwood Greens, 100 Feet Rd, Indiranagar");
@@ -193,6 +204,62 @@ export default function CheckoutPage() {
     }
   };
 
+  // Helper to complete order creation after payment verification
+  const completeOrderCreation = async (paymentTokens?: {
+    razorpayOrderId?: string;
+    razorpayPaymentId?: string;
+    razorpaySignature?: string;
+  }) => {
+    const payload = {
+      customerId: (session?.user as any)?.id || "usr_customer_1",
+      customerName: fullName,
+      customerEmail: session?.user?.email || "customer@example.com",
+      items: items.map((i) => ({
+        productId: i.productId,
+        variantId: i.variantId || undefined,
+        quantity: i.quantity,
+      })),
+      shippingAddress: {
+        fullName,
+        phone,
+        street,
+        city,
+        state,
+        postalCode,
+        country: "India",
+      },
+      deliveryMethod,
+      couponCode: coupon?.code || undefined,
+      paymentMethod: paymentMethod === "razorpay" ? "RAZORPAY" : "COD",
+      razorpayOrderId: paymentTokens?.razorpayOrderId,
+      razorpayPaymentId: paymentTokens?.razorpayPaymentId,
+      razorpaySignature: paymentTokens?.razorpaySignature,
+    };
+
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || "Failed to process order.");
+    }
+
+    const createdOrder: Order = data.data;
+    setConfirmedOrder(createdOrder);
+    clearCart();
+
+    addToast({
+      title: "Order Placed Successfully!",
+      description: `Order #${createdOrder.orderNumber} confirmed.`,
+      type: "success",
+    });
+  };
+
+  // 1. Customer initiates checkout
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -217,77 +284,166 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     try {
-      let rzpOrderId: string | undefined = undefined;
-      let rzpPaymentId: string | undefined = undefined;
-
-      // 1. If Razorpay, generate order token
-      if (paymentMethod === "razorpay") {
-        const rzpResponse = await paymentService.createRazorpayOrder(
-          total,
-          `rcpt_${Date.now()}`
-        );
-        rzpOrderId = rzpResponse.id;
-        rzpPaymentId = `pay_${Math.random().toString(36).substring(2, 14)}`;
-
-        // Simulated payment gateway authorization latency
-        await new Promise((res) => setTimeout(res, 900));
+      // If Cash on Delivery, bypass gateway and create order directly
+      if (paymentMethod === "cod") {
+        await completeOrderCreation();
+        setIsProcessing(false);
+        return;
       }
 
-      // 2. Submit order to server API with Authoritative Server Pricing
-      // Note: We only send product IDs, variant IDs, quantities, address, coupon, and payment tokens.
-      // The server recalculates and enforces authoritative prices from the database.
-      const payload = {
-        customerId: (session?.user as any)?.id || "usr_customer_1",
-        customerName: fullName,
-        customerEmail: session?.user?.email || "customer@example.com",
-        items: items.map((i) => ({
-          productId: i.productId,
-          variantId: i.variantId || undefined,
-          quantity: i.quantity,
-        })),
-        shippingAddress: {
-          fullName,
-          phone,
-          street,
-          city,
-          state,
-          postalCode,
-          country: "India",
-        },
-        deliveryMethod,
-        couponCode: coupon?.code || undefined,
-        paymentMethod: paymentMethod === "razorpay" ? "RAZORPAY" : "COD",
-        razorpayOrderId: rzpOrderId,
-        razorpayPaymentId: rzpPaymentId,
-      };
-
-      const res = await fetch("/api/orders", {
+      // Step 2. Server creates payment order via Razorpay API
+      const rzpRes = await fetch("/api/payments/razorpay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          amount: total,
+          receipt: `rcpt_${Date.now()}`,
+          currency: "INR",
+          notes: {
+            customerName: fullName,
+            itemCount: items.length.toString(),
+          },
+        }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to process order.");
+      const rzpData = await rzpRes.json();
+      if (!rzpRes.ok || !rzpData.success) {
+        throw new Error(rzpData.error || "Failed to initialize Razorpay payment order.");
       }
 
-      // Order created successfully!
-      const createdOrder: Order = data.data;
-      setConfirmedOrder(createdOrder);
-      clearCart();
+      const orderData = rzpData.data;
 
-      addToast({
-        title: "Order Placed Successfully!",
-        description: `Order #${createdOrder.orderNumber} confirmed.`,
-        type: "success",
-      });
+      // Step 3. Razorpay checkout opens
+      if (typeof window !== "undefined" && (window as any).Razorpay && isRazorpaySdkLoaded) {
+        const options = {
+          key: orderData.keyId,
+          amount: orderData.amount, // in paise
+          currency: orderData.currency || "INR",
+          name: "ProVenture Marketplace",
+          description: "Multi-Vendor Order Checkout",
+          order_id: orderData.orderId,
+          prefill: {
+            name: fullName,
+            email: session?.user?.email || "customer@example.com",
+            contact: phone,
+          },
+          theme: {
+            color: "#0A192F", // Deep Navy design token
+          },
+          // Step 4 & 5: Customer completes payment -> Server verifies signature
+          handler: async function (response: any) {
+            try {
+              // Step 5: Server verifies payment signature
+              const verifyRes = await fetch("/api/payments/razorpay/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  expectedAmount: total,
+                }),
+              });
+
+              const verifyData = await verifyRes.json();
+              if (!verifyRes.ok || !verifyData.success) {
+                throw new Error(verifyData.error || "Payment signature verification failed.");
+              }
+
+              // Step 8: Order payment status updated & order completed
+              await completeOrderCreation({
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              });
+            } catch (err: any) {
+              addToast({
+                title: "Verification Error",
+                description: err.message || "Cryptographic signature check failed.",
+                type: "error",
+              });
+            } finally {
+              setIsProcessing(false);
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              setIsProcessing(false);
+              addToast({
+                title: "Payment Window Closed",
+                description: "You closed the Razorpay checkout without completing payment.",
+                type: "warning",
+              });
+            },
+          },
+        };
+
+        const razorpayInstance = new (window as any).Razorpay(options);
+        razorpayInstance.on("payment.failed", function (response: any) {
+          setIsProcessing(false);
+          addToast({
+            title: "Payment Failed",
+            description: response.error?.description || "Payment authorization failed at bank.",
+            type: "error",
+          });
+        });
+
+        razorpayInstance.open();
+      } else {
+        // Fallback Interactive Simulation for Sandbox / Offline environments
+        setPendingSimulatedData(orderData);
+        setShowSimulatedModal(true);
+      }
     } catch (err: any) {
-      console.error("Checkout submission failed:", err);
+      console.error("Checkout initiation failed:", err);
       addToast({
         title: "Checkout Error",
-        description: err.message || "An error occurred while creating your order. Please retry.",
+        description: err.message || "Failed to process order. Please retry.",
+        type: "error",
+      });
+      setIsProcessing(false);
+    }
+  };
+
+  // Simulation handler for testing success scenario
+  const handleSimulatePaymentSuccess = async () => {
+    if (!pendingSimulatedData) return;
+
+    try {
+      const simulatedPaymentId = `pay_sim_${Date.now()}`;
+      // In mock mode, generate standard simulated token
+      const simulatedSignature = `sig_test_${Math.random().toString(36).substring(2, 14)}`;
+
+      // Step 5: Verify signature on server
+      const verifyRes = await fetch("/api/payments/razorpay/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          razorpayOrderId: pendingSimulatedData.orderId,
+          razorpayPaymentId: simulatedPaymentId,
+          razorpaySignature: simulatedSignature,
+          expectedAmount: total,
+        }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.success) {
+        throw new Error(verifyData.error || "Signature verification failed");
+      }
+
+      // Step 8: Order creation with verified payment token
+      await completeOrderCreation({
+        razorpayOrderId: pendingSimulatedData.orderId,
+        razorpayPaymentId: simulatedPaymentId,
+        razorpaySignature: simulatedSignature,
+      });
+
+      setShowSimulatedModal(false);
+      setPendingSimulatedData(null);
+    } catch (err: any) {
+      addToast({
+        title: "Simulation Verification Error",
+        description: err.message || "Failed to verify simulated payment.",
         type: "error",
       });
     } finally {
@@ -295,14 +451,26 @@ export default function CheckoutPage() {
     }
   };
 
+  // Simulation handler for testing failure scenario
+  const handleSimulatePaymentFailure = async () => {
+    setShowSimulatedModal(false);
+    setIsProcessing(false);
+    setPendingSimulatedData(null);
+
+    addToast({
+      title: "Payment Authorization Failed",
+      description: "Simulation: Transaction was declined by customer's bank (Insufficient funds/Invalid OTP).",
+      type: "error",
+    });
+  };
+
   // Success Confirmation Screen
   if (confirmedOrder) {
-    // Group line items by seller for multi-vendor fulfillment view
     const sellerDispatches = confirmedOrder.items.reduce((acc, item) => {
       const sellerKey = item.sellerId || "default";
       if (!acc[sellerKey]) {
         acc[sellerKey] = {
-          sellerName: item.seller?.storeName || item.title.includes("Audio") ? "SoundCraft Pro" : "Verified Merchant",
+          sellerName: item.seller?.storeName || (item.title.includes("Audio") ? "SoundCraft Pro" : "Verified Merchant"),
           carrier: item.carrier || "BlueDart Express",
           trackingNumber: item.trackingNumber || `TRK-${confirmedOrder.orderNumber}`,
           fulfillmentStatus: item.fulfillmentStatus || "CONFIRMED",
@@ -321,7 +489,7 @@ export default function CheckoutPage() {
           </div>
           <h1 className="text-3xl font-black text-foreground tracking-tight">Order Confirmed!</h1>
           <p className="text-sm text-muted-foreground">
-            Thank you for shopping on ProVenture Marketplace. Your order has been placed successfully.
+            Thank you for shopping on ProVenture Marketplace. Your transaction has been secured and confirmed.
           </p>
         </div>
 
@@ -343,7 +511,7 @@ export default function CheckoutPage() {
                     : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400"
                 }`}
               >
-                ● {confirmedOrder.paymentStatus === "PAID" ? "PAID via Razorpay" : "PENDING (Cash on Delivery)"}
+                ● {confirmedOrder.paymentStatus === "PAID" ? "PAID (Razorpay Verified)" : "PENDING (Cash on Delivery)"}
               </span>
             </div>
             <div>
@@ -429,7 +597,6 @@ export default function CheckoutPage() {
     );
   }
 
-  // If cart is empty and not confirmed
   if (items.length === 0) {
     return (
       <div className="container py-20 text-center max-w-md mx-auto space-y-4">
@@ -451,12 +618,19 @@ export default function CheckoutPage() {
 
   return (
     <div className="container py-8 space-y-8">
+      {/* Load Razorpay official checkout SDK */}
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        onLoad={() => setIsRazorpaySdkLoaded(true)}
+        onError={() => setIsRazorpaySdkLoaded(false)}
+      />
+
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
           Secure Checkout
         </h1>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Multi-Vendor Unified Dispatch • Authoritative Server Pricing • 256-Bit SSL Protection
+          Official Razorpay Payment Gateway • Cryptographic HMAC-SHA256 Verification • 256-Bit SSL Protection
         </p>
       </div>
 
@@ -716,15 +890,15 @@ export default function CheckoutPage() {
                 />
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-foreground">
+                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
                       Razorpay Gateway (UPI, Cards, NetBanking)
                     </span>
                     <span className="text-[10px] bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full">
-                      Instant & Zero Surcharge
+                      Instant & Verified
                     </span>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    Pay securely using Google Pay, PhonePe, Paytm UPI, or Visa, MasterCard, RuPay cards.
+                    Pay securely using Google Pay, PhonePe, Paytm UPI, or Visa, MasterCard, RuPay cards with cryptographic signature verification.
                   </p>
                 </div>
               </label>
@@ -896,7 +1070,7 @@ export default function CheckoutPage() {
               <Lock className="h-4 w-4" />
               <span>
                 {isProcessing
-                  ? "Verifying & Creating Order..."
+                  ? "Verifying & Authorizing Gateway..."
                   : paymentMethod === "cod"
                   ? `Confirm Order with COD (${formatPrice(total)})`
                   : `Authorize & Pay ${formatPrice(total)}`}
@@ -910,6 +1084,79 @@ export default function CheckoutPage() {
           </div>
         </div>
       </form>
+
+      {/* Interactive Razorpay Sandbox Simulation Dialog */}
+      {showSimulatedModal && pendingSimulatedData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-card border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <h3 className="font-bold text-sm text-foreground">Razorpay Sandbox Gateway</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowSimulatedModal(false);
+                  setIsProcessing(false);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-muted/40 rounded-xl space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Order ID:</span>
+                  <span className="font-mono font-bold text-foreground">{pendingSimulatedData.orderId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Amount:</span>
+                  <span className="font-bold text-foreground">
+                    {formatPrice(pendingSimulatedData.amount / 100)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Receipt:</span>
+                  <span className="font-mono text-[11px]">{pendingSimulatedData.receipt}</span>
+                </div>
+              </div>
+
+              <p className="text-muted-foreground text-[11px] leading-relaxed">
+                Test the payment gateway flow and verify cryptographic HMAC-SHA256 signature generation, anti-replay guards, and status segregation.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <Button
+                onClick={handleSimulatePaymentSuccess}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1.5"
+              >
+                <CheckCircle2 className="h-4 w-4" /> Simulate Successful Payment (Verify & Capture)
+              </Button>
+
+              <Button
+                onClick={handleSimulatePaymentFailure}
+                variant="outline"
+                className="w-full text-rose-600 hover:text-rose-700 border-rose-200 dark:border-rose-900 font-semibold text-xs gap-1.5"
+              >
+                <AlertTriangle className="h-4 w-4" /> Simulate Payment Failure (Bank Decline)
+              </Button>
+
+              <button
+                onClick={() => {
+                  setShowSimulatedModal(false);
+                  setIsProcessing(false);
+                }}
+                className="w-full text-center text-xs text-muted-foreground hover:underline pt-1"
+              >
+                Dismiss Modal (User Cancelled)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
