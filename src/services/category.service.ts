@@ -101,4 +101,21 @@ export const categoryService = {
     localCategories.push(newCat);
     return newCat;
   },
+
+  async updateCategory(id: string, updates: Partial<Category>): Promise<Category | null> {
+    const idx = localCategories.findIndex((c) => c.id === id);
+    if (idx === -1) return null;
+
+    localCategories[idx] = {
+      ...localCategories[idx],
+      ...updates,
+    };
+    return localCategories[idx];
+  },
+
+  async deleteCategory(id: string): Promise<boolean> {
+    const initialLen = localCategories.length;
+    localCategories = localCategories.filter((c) => c.id !== id);
+    return localCategories.length < initialLen;
+  },
 };
