@@ -9,6 +9,14 @@ import {
 } from "@/types";
 import { generateOrderNumber, formatPrice, formatDate } from "@/lib/utils";
 import { prisma } from "@/lib/db/prisma";
+import {
+  sendOrderConfirmationEmail,
+  sendPaymentConfirmationEmail,
+  sendShippingNotificationEmail,
+  sendRefundNotificationEmail,
+} from "./email.service";
+import { NotificationService } from "./notification.service";
+import { NotificationType } from "@prisma/client";
 
 // State Machine Definition for Valid Order Status Transitions
 export const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
@@ -535,6 +543,65 @@ export const orderService = {
       description: description || `Order transitioned from ${previousStatus} to ${status}.`,
     });
 
+    // Background transactional email & in-app notification
+    try {
+      const customerEmail = (currentOrder as any).customerEmail || (currentOrder as any).email || "customer@example.com";
+      const customerName = currentOrder.shippingAddress?.fullName || "Customer";
+      const targetUserId = currentOrder.customerId || (currentOrder as any).userId || "usr_customer_1";
+
+      if (status === "SHIPPED") {
+        const carrierName = (currentOrder as any).carrier || currentOrder.items[0]?.carrier || "Blue Dart Express";
+        const awb = (currentOrder as any).trackingNumber || currentOrder.items[0]?.trackingNumber || `AWB-${Math.floor(100000000 + Math.random() * 900000000)}`;
+
+        sendShippingNotificationEmail(
+          customerEmail,
+          {
+            name: customerName,
+            orderNumber: currentOrder.orderNumber,
+            carrier: carrierName,
+            trackingNumber: awb,
+            estimatedDelivery: "In 3-5 business days",
+            trackingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/customer/orders/${currentOrder.id}`,
+            items: currentOrder.items.map((i) => ({ title: i.title, quantity: i.quantity })),
+          },
+          true
+        );
+
+        NotificationService.createNotification({
+          userId: targetUserId,
+          title: `Shipment Dispatched: #${currentOrder.orderNumber}`,
+          message: `Your package is on its way via ${carrierName} (AWB: ${awb}).`,
+          type: NotificationType.ORDER_UPDATE,
+          data: { orderId: currentOrder.id, trackingNumber: awb, carrier: carrierName },
+        });
+      } else if (status === "REFUNDED") {
+        const refundRef = `rfnd_${Date.now()}`;
+
+        sendRefundNotificationEmail(
+          customerEmail,
+          {
+            name: customerName,
+            orderNumber: currentOrder.orderNumber,
+            refundAmount: currentOrder.total,
+            refundId: refundRef,
+            reason: description || "Order return or cancellation refund processed.",
+            timeline: "5 to 7 banking business days",
+          },
+          true
+        );
+
+        NotificationService.createNotification({
+          userId: targetUserId,
+          title: `Refund Processed: ₹${currentOrder.total.toLocaleString("en-IN")}`,
+          message: `Refund ${refundRef} issued for #${currentOrder.orderNumber}. Credited to original source.`,
+          type: NotificationType.PAYMENT,
+          data: { orderId: currentOrder.id, refundAmount: currentOrder.total },
+        });
+      }
+    } catch (notifErr) {
+      console.warn("Non-critical background notification failed:", notifErr);
+    }
+
     return localOrders[index];
   },
 
@@ -569,6 +636,65 @@ export const orderService = {
             changedByRole: "SYSTEM",
             description: "Payment confirmed. Order moved to Confirmed.",
           });
+
+          // Non-blocking customer email confirmation and in-app alert
+          try {
+            const ord = localOrders[index];
+            const customerEmail = (ord as any).customerEmail || (ord as any).email || "customer@example.com";
+            const customerName = ord.shippingAddress?.fullName || "Customer";
+
+            sendOrderConfirmationEmail(
+              customerEmail,
+              {
+                name: customerName,
+                orderId: ord.id,
+                orderNumber: ord.orderNumber,
+                items: ord.items.map((i) => ({
+                  title: i.title,
+                  quantity: i.quantity,
+                  price: i.price,
+                  sellerName: (i as any).storeName || "Vendor",
+                })),
+                subtotal: ord.subtotal,
+                tax: ord.tax,
+                shipping: (ord as any).shipping ?? ord.shippingFee ?? 0,
+                total: ord.total,
+                shippingAddress: {
+                  fullName: ord.shippingAddress.fullName,
+                  street: ord.shippingAddress.street,
+                  city: ord.shippingAddress.city,
+                  state: ord.shippingAddress.state,
+                  postalCode: ord.shippingAddress.postalCode,
+                },
+                trackingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/customer/orders/${ord.id}`,
+              },
+              true
+            );
+
+            sendPaymentConfirmationEmail(
+              customerEmail,
+              {
+                name: customerName,
+                orderNumber: ord.orderNumber,
+                paymentId: paymentDetails?.razorpayPaymentId || `pay_${Date.now()}`,
+                paymentMethod: paymentDetails?.method || "Razorpay Online",
+                amount: ord.total,
+                date: new Date().toLocaleString("en-IN"),
+                invoiceUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/customer/orders/${ord.id}`,
+              },
+              true
+            );
+
+            NotificationService.createNotification({
+              userId: ord.customerId || (ord as any).userId || "usr_customer_1",
+              title: `Order Confirmed: #${ord.orderNumber}`,
+              message: `Your payment of ₹${ord.total.toLocaleString("en-IN")} was verified. Merchant notified.`,
+              type: NotificationType.ORDER_UPDATE,
+              data: { orderId: ord.id, orderNumber: ord.orderNumber },
+            });
+          } catch (notifErr) {
+            console.warn("Non-critical order confirmation notification failed:", notifErr);
+          }
         }
       } else if (paymentStatus === "FAILED") {
         localOrders[index].status = "CANCELLED";

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { hashPassword, generateSecureToken } from "@/lib/auth/password";
 import { sanitizeRegistrationRole } from "@/lib/auth/server-guard";
+import { sendWelcomeEmail, sendVerificationEmail } from "@/services/email.service";
+import { NotificationService } from "@/services/notification.service";
+import { NotificationType } from "@prisma/client";
 import { z } from "zod";
 
 const RegisterInputSchema = z.object({
@@ -97,6 +100,24 @@ export async function POST(req: NextRequest) {
           role: user.role,
           verificationToken,
         };
+      });
+
+      const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/verify-email?token=${newUser.verificationToken}&email=${encodeURIComponent(
+        newUser.email
+      )}`;
+
+      // Non-blocking background notifications & emails
+      sendWelcomeEmail(normalizedEmail, { name, email: normalizedEmail }, true);
+      sendVerificationEmail(
+        normalizedEmail,
+        { name, email: normalizedEmail, verificationUrl },
+        true
+      );
+      NotificationService.createNotification({
+        userId: newUser.id,
+        title: "Welcome to ProVenture Marketplace",
+        message: `Hello ${name}, explore curated collections from independent artisans.`,
+        type: NotificationType.INFO,
       });
 
       return NextResponse.json(

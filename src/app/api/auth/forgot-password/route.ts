@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { generateSecureToken } from "@/lib/auth/password";
+import { sendPasswordResetEmail } from "@/services/email.service";
 
 export async function POST(req: NextRequest) {
   try {
@@ -55,13 +56,27 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/reset-password?token=${resetToken}&email=${encodeURIComponent(
+        normalizedEmail
+      )}`;
+
+      // Non-blocking password reset email
+      sendPasswordResetEmail(
+        normalizedEmail,
+        {
+          name: user.name || "Customer",
+          email: normalizedEmail,
+          resetUrl,
+          ipAddress: req.ip || req.headers.get("x-forwarded-for") || undefined,
+        },
+        true
+      );
+
       return NextResponse.json({
         success: true,
         message: "Password reset link generated successfully.",
         data: {
-          resetUrl: `/reset-password?token=${resetToken}&email=${encodeURIComponent(
-            normalizedEmail
-          )}`,
+          resetUrl,
         },
       });
     } catch (dbErr: any) {

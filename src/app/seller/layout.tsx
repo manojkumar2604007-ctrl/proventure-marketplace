@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { NotificationDropdown } from "@/components/ui/notification-dropdown";
 
 const MOCK_SELLER_NOTIFICATIONS = [
   {
@@ -145,87 +146,8 @@ export default function SellerLayout({
               </Button>
             </Link>
 
-            {/* Notifications Popover */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setIsNotificationOpen(!isNotificationOpen);
-                  setIsProfileMenuOpen(false);
-                }}
-                className="relative p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
-                aria-label="Notifications"
-              >
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-background" />
-                )}
-              </button>
-
-              {isNotificationOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsNotificationOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-border bg-card shadow-xl z-50 p-4 space-y-3 animate-in fade-in zoom-in-95 duration-100">
-                    <div className="flex items-center justify-between pb-2 border-b border-border/60">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-foreground">
-                          Seller Notifications
-                        </span>
-                        {unreadCount > 0 && (
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                            {unreadCount} new
-                          </Badge>
-                        )}
-                      </div>
-                      {unreadCount > 0 && (
-                        <button
-                          onClick={markAllRead}
-                          className="text-[11px] text-primary hover:underline font-semibold"
-                        >
-                          Mark all as read
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1 divide-y divide-border/40">
-                      {notifications.map((n) => (
-                        <div
-                          key={n.id}
-                          className={`pt-2 first:pt-0 pb-1 text-xs space-y-1 ${
-                            n.unread ? "font-medium" : "text-muted-foreground opacity-85"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-foreground text-xs flex items-center gap-1.5">
-                              {n.type === "order" && <ShoppingBag className="h-3 w-3 text-primary" />}
-                              {n.type === "alert" && <AlertTriangle className="h-3 w-3 text-amber-500" />}
-                              {n.type === "payout" && <DollarSign className="h-3 w-3 text-emerald-600" />}
-                              {n.title}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">{n.time}</span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground leading-relaxed">
-                            {n.message}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="pt-2 border-t border-border/60 text-center">
-                      <Link
-                        href="/seller/notifications"
-                        onClick={() => setIsNotificationOpen(false)}
-                        className="text-xs text-primary hover:underline font-semibold"
-                      >
-                        View all seller alerts
-                      </Link>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Real-Time Database Backed Notifications */}
+            <NotificationDropdown variant="seller" />
 
             {/* Seller Profile Menu */}
             <div className="relative">

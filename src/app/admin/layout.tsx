@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { NotificationDropdown } from "@/components/ui/notification-dropdown";
 
 const MOCK_ADMIN_NOTIFICATIONS = [
   {
@@ -145,87 +146,8 @@ export default function AdminLayout({
               </Button>
             </Link>
 
-            {/* Notifications Popover */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setIsNotificationOpen(!isNotificationOpen);
-                  setIsProfileMenuOpen(false);
-                }}
-                className="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                aria-label="Platform Alerts"
-              >
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-[#0A192F]" />
-                )}
-              </button>
-
-              {isNotificationOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsNotificationOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-slate-800 bg-[#0A192F] shadow-2xl z-50 p-4 space-y-3 animate-in fade-in zoom-in-95 duration-100">
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-white">
-                          Operations Alerts
-                        </span>
-                        {unreadCount > 0 && (
-                          <Badge className="text-[10px] bg-blue-600 text-white px-1.5 py-0">
-                            {unreadCount} new
-                          </Badge>
-                        )}
-                      </div>
-                      {unreadCount > 0 && (
-                        <button
-                          onClick={markAllRead}
-                          className="text-[11px] text-blue-400 hover:underline font-semibold"
-                        >
-                          Mark all as read
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1 divide-y divide-slate-800/60">
-                      {notifications.map((n) => (
-                        <div
-                          key={n.id}
-                          className={`pt-2 first:pt-0 pb-1 text-xs space-y-1 ${
-                            n.unread ? "font-medium text-slate-200" : "text-slate-400"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-white text-xs flex items-center gap-1.5">
-                              {n.type === "seller" && <Store className="h-3 w-3 text-amber-400" />}
-                              {n.type === "order" && <DollarSign className="h-3 w-3 text-emerald-400" />}
-                              {n.type === "system" && <CheckCircle2 className="h-3 w-3 text-blue-400" />}
-                              {n.title}
-                            </span>
-                            <span className="text-[10px] text-slate-500">{n.time}</span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 leading-relaxed">
-                            {n.message}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-800 text-center">
-                      <Link
-                        href="/admin/audit-logs"
-                        onClick={() => setIsNotificationOpen(false)}
-                        className="text-xs text-blue-400 hover:underline font-semibold"
-                      >
-                        View System Audit Log
-                      </Link>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Real-Time Database Backed Operations Alerts */}
+            <NotificationDropdown variant="admin" />
 
             {/* Admin Profile Menu */}
             <div className="relative">

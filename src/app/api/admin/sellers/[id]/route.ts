@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/server-guard";
 import { vendorService } from "@/services/vendor.service";
 import { adminService } from "@/services/admin.service";
+import { sendSellerApprovalEmail, sendSellerRejectionEmail } from "@/services/email.service";
+import { NotificationService } from "@/services/notification.service";
 
 export async function PUT(
   request: NextRequest,
@@ -31,6 +33,42 @@ export async function PUT(
         entityId: sellerId,
         details: `Seller ${sellerId} status changed to ${status}.`,
       });
+
+      // Background email and in-app notification to seller
+      if (updated && updated.email) {
+        const storeDisplayName = updated.storeName || "Your Store";
+        const sellerDisplayName = updated.storeName || "Merchant Partner";
+
+        if (status === "APPROVED") {
+          sendSellerApprovalEmail(
+            updated.email,
+            { storeName: storeDisplayName, sellerName: sellerDisplayName },
+            true
+          );
+          NotificationService.createNotification({
+            userId: updated.userId,
+            title: "Merchant Account Verified & Approved! 🎉",
+            message: `Congratulations! Your store "${storeDisplayName}" is now active on ProVenture.`,
+            type: "SYSTEM",
+          });
+        } else if (status === "REJECTED") {
+          sendSellerRejectionEmail(
+            updated.email,
+            {
+              storeName: storeDisplayName,
+              sellerName: sellerDisplayName,
+              reason: body.rejectionReason || "Business documentation did not meet marketplace compliance standards.",
+            },
+            true
+          );
+          NotificationService.createNotification({
+            userId: updated.userId,
+            title: "Seller Application Status Update",
+            message: `Your application for "${storeDisplayName}" could not be approved at this time.`,
+            type: "SYSTEM",
+          });
+        }
+      }
     }
 
     if (typeof commissionRate === "number") {

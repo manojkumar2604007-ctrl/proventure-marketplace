@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SearchBar } from "@/components/ui/search-bar";
+import { NotificationDropdown } from "@/components/ui/notification-dropdown";
 import { useCartStore } from "@/store/cart-store";
 import { useWishlistStore } from "@/store/wishlist-store";
 import { useUIStore } from "@/store/ui-store";
@@ -126,6 +127,9 @@ export function StorefrontHeader() {
               )}
             </Button>
           </Link>
+
+          {/* In-App Notifications Dropdown */}
+          <NotificationDropdown variant="storefront" />
 
           {/* Cart Trigger */}
           <Button
