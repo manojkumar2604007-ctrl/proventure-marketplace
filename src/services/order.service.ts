@@ -3,8 +3,17 @@ import { Order, OrderItem, OrderStatus, ShippingAddress } from "@/types";
 import { generateOrderNumber } from "@/lib/utils";
 
 let localOrders: Order[] = [...MOCK_ORDERS];
+const recordedPaymentIds = new Set<string>();
 
 export const orderService = {
+  isPaymentRecorded(paymentId: string): boolean {
+    return recordedPaymentIds.has(paymentId);
+  },
+
+  recordPaymentId(paymentId: string): void {
+    recordedPaymentIds.add(paymentId);
+  },
+
   async getAllOrders(): Promise<Order[]> {
     return localOrders;
   },
@@ -38,14 +47,27 @@ export const orderService = {
       price: number;
       quantity: number;
       variantName?: string;
+      carrier?: string;
+      trackingNumber?: string;
+      fulfillmentStatus?: OrderStatus;
     }>;
     subtotal: number;
     shippingFee: number;
+    tax?: number;
     discount: number;
     total: number;
     shippingAddress: ShippingAddress;
     paymentMethod?: string;
+    paymentStatus?: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+    razorpayPaymentId?: string;
   }): Promise<Order> {
+    if (data.razorpayPaymentId) {
+      if (orderService.isPaymentRecorded(data.razorpayPaymentId)) {
+        throw new Error("Duplicate payment transaction detected. Order cannot be duplicated.");
+      }
+      orderService.recordPaymentId(data.razorpayPaymentId);
+    }
+
     const orderId = `ord_${Date.now()}`;
     const orderNumber = generateOrderNumber();
 
@@ -59,9 +81,11 @@ export const orderService = {
       quantity: item.quantity,
       total: item.price * item.quantity,
       variantName: item.variantName || null,
-      fulfillmentStatus: "CONFIRMED",
-      trackingNumber: `TRK-EXP-${Math.floor(10000 + Math.random() * 90000)}`,
-      carrier: "Express Cargo",
+      fulfillmentStatus: item.fulfillmentStatus || "CONFIRMED",
+      trackingNumber:
+        item.trackingNumber ||
+        `TRK-EXP-${Math.floor(10000 + Math.random() * 90000)}`,
+      carrier: item.carrier || "BlueDart Express",
     }));
 
     const newOrder: Order = {
@@ -74,10 +98,10 @@ export const orderService = {
         email: data.customerEmail || "customer@example.com",
       },
       status: "PROCESSING",
-      paymentStatus: "PAID",
+      paymentStatus: (data.paymentStatus as any) || (data.paymentMethod === "COD" ? "PENDING" : "PAID"),
       subtotal: data.subtotal,
       shippingFee: data.shippingFee,
-      tax: 0,
+      tax: data.tax || 0,
       discount: data.discount,
       total: data.total,
       shippingAddress: data.shippingAddress,

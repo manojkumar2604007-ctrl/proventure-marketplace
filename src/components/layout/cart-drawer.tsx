@@ -28,7 +28,7 @@ export function CartDrawer() {
   const discount = getDiscount();
   const total = getTotal();
   const grouped = getGroupedBySeller();
-  const freeShippingThreshold = 2000;
+  const freeShippingThreshold = 2999;
   const progressToFreeShipping = Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100));
 
   return (

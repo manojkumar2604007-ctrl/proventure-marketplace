@@ -2,16 +2,28 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { CartItem } from "@/types";
 
+export interface AppliedCoupon {
+  code: string;
+  discountPercent?: number;
+  discountAmount?: number;
+}
+
 interface CartStore {
   items: CartItem[];
+  coupon: AppliedCoupon | null;
+  deliveryMethod: "standard" | "express";
   addItem: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
+  applyCoupon: (code: string, discountPercent?: number, discountAmount?: number) => void;
+  removeCoupon: () => void;
+  setDeliveryMethod: (method: "standard" | "express") => void;
   getTotalItems: () => number;
   getSubtotal: () => number;
   getShippingFee: () => number;
   getDiscount: () => number;
+  getTax: () => number;
   getTotal: () => number;
   getGroupedBySeller: () => Record<string, { sellerName: string; items: CartItem[] }>;
 }
@@ -20,6 +32,8 @@ export const useCartStore = create<CartStore>()(
   persist(
     (set, get) => ({
       items: [],
+      coupon: null,
+      deliveryMethod: "standard",
 
       addItem: (item, quantity = 1) => {
         set((state) => {
@@ -60,7 +74,21 @@ export const useCartStore = create<CartStore>()(
         }));
       },
 
-      clearCart: () => set({ items: [] }),
+      clearCart: () => set({ items: [], coupon: null }),
+
+      applyCoupon: (code, discountPercent, discountAmount) => {
+        set({
+          coupon: {
+            code: code.toUpperCase(),
+            discountPercent,
+            discountAmount,
+          },
+        });
+      },
+
+      removeCoupon: () => set({ coupon: null }),
+
+      setDeliveryMethod: (method) => set({ deliveryMethod: method }),
 
       getTotalItems: () => {
         return get().items.reduce((acc, item) => acc + item.quantity, 0);
@@ -73,18 +101,38 @@ export const useCartStore = create<CartStore>()(
       getShippingFee: () => {
         const subtotal = get().getSubtotal();
         if (subtotal === 0) return 0;
-        return subtotal >= 2000 ? 0 : 150; // Free shipping over ₹2000
+        const method = get().deliveryMethod;
+        const baseShipping = subtotal >= 2999 ? 0 : 149;
+        return method === "express" ? baseShipping + 199 : baseShipping;
       },
 
       getDiscount: () => {
         const subtotal = get().getSubtotal();
-        return subtotal >= 5000 ? Math.round(subtotal * 0.05) : 0; // 5% discount over ₹5000
+        const coupon = get().coupon;
+        if (!coupon || subtotal === 0) return 0;
+
+        if (coupon.discountAmount) {
+          return Math.min(coupon.discountAmount, subtotal);
+        }
+        if (coupon.discountPercent) {
+          return Math.round((subtotal * coupon.discountPercent) / 100);
+        }
+        return 0;
+      },
+
+      getTax: () => {
+        const subtotal = get().getSubtotal();
+        const discount = get().getDiscount();
+        const taxable = Math.max(0, subtotal - discount);
+        // Standard 18% GST component (inclusive/calculated)
+        return Math.round(taxable * 0.18);
       },
 
       getTotal: () => {
         const subtotal = get().getSubtotal();
         const shipping = get().getShippingFee();
         const discount = get().getDiscount();
+        // Grand Total: Subtotal - Discount + Shipping
         return Math.max(0, subtotal + shipping - discount);
       },
 
@@ -93,7 +141,7 @@ export const useCartStore = create<CartStore>()(
         return items.reduce((acc, item) => {
           if (!acc[item.sellerId]) {
             acc[item.sellerId] = {
-              sellerName: item.sellerName,
+              sellerName: item.sellerName || "Verified Merchant",
               items: [],
             };
           }

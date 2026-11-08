@@ -15,6 +15,7 @@ export interface CreateOrderInput {
   }>;
   subtotal: number;
   shippingFee: number;
+  tax?: number;
   discount: number;
   total: number;
   shippingAddress: any;
@@ -35,6 +36,16 @@ export const dbTransactionService = {
    */
   async createOrderWithAtomicInventory(input: CreateOrderInput) {
     return await prisma.$transaction(async (tx) => {
+      // 0. Idempotency Check: Prevent duplicate payment processing
+      if (input.razorpayPaymentId) {
+        const existingPayment = await tx.payment.findFirst({
+          where: { razorpayPaymentId: input.razorpayPaymentId },
+        });
+        if (existingPayment) {
+          throw new Error("Duplicate payment transaction detected. Order cannot be duplicated.");
+        }
+      }
+
       // 1. Validate & Atomically decrement inventory for all items
       for (const item of input.items) {
         // Find specific inventory record for store + product + variant
@@ -65,16 +76,18 @@ export const dbTransactionService = {
       }
 
       // 2. Create Order Header
+      const isCod = input.paymentMethod?.toUpperCase() === "COD";
+      const initialPaymentStatus = isCod ? "PENDING" : "PAID";
       const orderNumber = generateOrderNumber();
       const order = await tx.order.create({
         data: {
           orderNumber,
           userId: input.userId,
           status: "PROCESSING",
-          paymentStatus: "PAID",
+          paymentStatus: initialPaymentStatus,
           subtotal: new Prisma.Decimal(input.subtotal.toFixed(2)),
           shippingFee: new Prisma.Decimal(input.shippingFee.toFixed(2)),
-          tax: new Prisma.Decimal("0.00"),
+          tax: new Prisma.Decimal((input.tax ?? 0).toFixed(2)),
           discount: new Prisma.Decimal(input.discount.toFixed(2)),
           total: new Prisma.Decimal(input.total.toFixed(2)),
           couponId: input.couponId || null,
@@ -123,12 +136,12 @@ export const dbTransactionService = {
           orderId: order.id,
           amount: new Prisma.Decimal(input.total.toFixed(2)),
           currency: "INR",
-          status: "PAID",
+          status: initialPaymentStatus,
           method: input.paymentMethod,
           razorpayOrderId: input.razorpayOrderId || null,
           razorpayPaymentId: input.razorpayPaymentId || null,
           razorpaySignature: input.razorpaySignature || null,
-          paidAt: new Date(),
+          paidAt: isCod ? null : new Date(),
         },
       });
 
