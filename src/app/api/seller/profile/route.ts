@@ -6,8 +6,22 @@ import { vendorService } from "@/services/vendor.service";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const sellerId = (session?.user as any)?.sellerProfileId || "seller_technexus";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
+    }
 
+    const role = (session.user as any).role;
+    if (role !== "SELLER" && role !== "ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Only authorized merchants can access store profile." },
+        { status: 403 }
+      );
+    }
+
+    const sellerId = (session.user as any).sellerProfileId || (session.user as any).storeId || (session.user as any).id;
     const vendor = await vendorService.getVendorById(sellerId);
     if (!vendor) {
       return NextResponse.json({ success: false, error: "Seller profile not found" }, { status: 404 });
@@ -25,18 +39,22 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const sellerId = (session?.user as any)?.sellerProfileId || "seller_technexus";
-
-    if (session?.user) {
-      const role = (session.user as any).role;
-      if (role !== "SELLER" && role !== "ADMIN") {
-        return NextResponse.json(
-          { success: false, error: "Forbidden: Only authorized merchants can update store profile." },
-          { status: 403 }
-        );
-      }
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
     }
 
+    const role = (session.user as any).role;
+    if (role !== "SELLER" && role !== "ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Only authorized merchants can update store profile." },
+        { status: 403 }
+      );
+    }
+
+    const sellerId = (session.user as any).sellerProfileId || (session.user as any).storeId || (session.user as any).id;
     const updates = await request.json();
     const vendor = await vendorService.getVendorById(sellerId);
     if (!vendor) {

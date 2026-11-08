@@ -313,6 +313,9 @@ model Product {
   @@index([status])
   @@index([featured])
   @@index([slug])
+  @@index([status, createdAt])
+  @@index([price])
+  @@index([rating])
 }
 
 // ==========================================
@@ -492,6 +495,8 @@ model Order {
   @@index([orderNumber])
   @@index([status])
   @@index([paymentStatus])
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }
 
 // ==========================================
@@ -529,6 +534,7 @@ model OrderItem {
   @@index([orderId])
   @@index([storeId])
   @@index([productId])
+  @@index([storeId, fulfillmentStatus])
 }
 
 // ==========================================
@@ -607,6 +613,7 @@ model Review {
   @@index([productId])
   @@index([userId])
   @@index([rating])
+  @@index([productId, createdAt])
 }
 
 // ==========================================
@@ -655,6 +662,7 @@ model Notification {
   @@index([userId])
   @@index([read])
   @@index([type])
+  @@index([userId, read])
 }
 
 // ==========================================

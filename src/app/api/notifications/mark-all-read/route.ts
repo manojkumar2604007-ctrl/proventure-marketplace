@@ -12,7 +12,13 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = session?.user?.id || (session?.user as any)?.email || "usr_customer_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
+    }
+    const userId = session.user.id || (session.user as any).email;
 
     const updatedCount = await NotificationService.markAllAsRead(userId);
 

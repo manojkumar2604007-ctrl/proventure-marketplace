@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { MOCK_CATEGORIES } from "@/lib/db/mock-data";
-import { Category } from "@/types";
+import type { Category } from "@/types";
 
 let localCategories: Category[] = [...MOCK_CATEGORIES];
 

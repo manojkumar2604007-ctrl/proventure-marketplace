@@ -7,9 +7,7 @@ export async function GET(request: NextRequest) {
     try {
       await requireAdmin();
     } catch (e: any) {
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.json({ success: false, error: e.message }, { status: e.status || 403 });
-      }
+      return NextResponse.json({ success: false, error: e.message || "Forbidden: Admin access required" }, { status: e.status || 403 });
     }
 
     const { searchParams } = new URL(request.url);

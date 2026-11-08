@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { MOCK_SELLERS, MOCK_ORDERS } from "@/lib/db/mock-data";
-import { SellerProfile, SellerMetrics, SellerStatus } from "@/types";
+import type { SellerProfile, SellerMetrics, SellerStatus } from "@/types";
 import { productService } from "./product.service";
 
 let localSellers: SellerProfile[] = [...MOCK_SELLERS];

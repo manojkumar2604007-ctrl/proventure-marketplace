@@ -9,7 +9,13 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_customer_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to edit your review." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
     const reviewId = params.id;
 
     const body = await request.json();
@@ -47,7 +53,13 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_customer_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to delete your review." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
     const reviewId = params.id;
 
     const result = await reviewService.deleteReview(userId, reviewId);

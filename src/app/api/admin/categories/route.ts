@@ -19,9 +19,7 @@ export async function POST(request: NextRequest) {
     try {
       await requireAdmin();
     } catch (e: any) {
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.json({ success: false, error: e.message }, { status: e.status || 403 });
-      }
+      return NextResponse.json({ success: false, error: e.message || "Forbidden: Admin access required" }, { status: e.status || 403 });
     }
 
     const body = await request.json();
@@ -54,9 +52,7 @@ export async function PUT(request: NextRequest) {
     try {
       await requireAdmin();
     } catch (e: any) {
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.json({ success: false, error: e.message }, { status: e.status || 403 });
-      }
+      return NextResponse.json({ success: false, error: e.message || "Forbidden: Admin access required" }, { status: e.status || 403 });
     }
 
     const body = await request.json();
@@ -85,9 +81,7 @@ export async function DELETE(request: NextRequest) {
     try {
       await requireAdmin();
     } catch (e: any) {
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.json({ success: false, error: e.message }, { status: e.status || 403 });
-      }
+      return NextResponse.json({ success: false, error: e.message || "Forbidden: Admin access required" }, { status: e.status || 403 });
     }
 
     const { searchParams } = new URL(request.url);

@@ -9,7 +9,22 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const sellerId = (session?.user as any)?.sellerProfileId || "seller_technexus";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
+    }
+
+    const role = (session.user as any).role;
+    if (role !== "SELLER" && role !== "ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Only authorized merchants can query orders." },
+        { status: 403 }
+      );
+    }
+
+    const sellerId = (session.user as any).sellerProfileId || (session.user as any).storeId || (session.user as any).id;
     const orderId = params.id;
 
     const order = await orderService.getOrderById(orderId);
@@ -19,14 +34,11 @@ export async function GET(
 
     // Verify order contains items from this seller
     const hasSellerItems = order.items.some((i) => i.sellerId === sellerId);
-    if (session?.user) {
-      const role = (session.user as any).role;
-      if (role !== "ADMIN" && !hasSellerItems) {
-        return NextResponse.json(
-          { success: false, error: "Forbidden: You cannot access orders without your store's merchandise." },
-          { status: 403 }
-        );
-      }
+    if (role !== "ADMIN" && !hasSellerItems) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: You cannot access orders without your store's merchandise." },
+        { status: 403 }
+      );
     }
 
     return NextResponse.json({ success: true, data: order });
@@ -44,7 +56,22 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const sellerId = (session?.user as any)?.sellerProfileId || "seller_technexus";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
+    }
+
+    const role = (session.user as any).role;
+    if (role !== "SELLER" && role !== "ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Only authorized merchants can update orders." },
+        { status: 403 }
+      );
+    }
+
+    const sellerId = (session.user as any).sellerProfileId || (session.user as any).storeId || (session.user as any).id;
     const orderId = params.id;
 
     const order = await orderService.getOrderById(orderId);
@@ -62,7 +89,7 @@ export async function PUT(
         approved ?? true,
         {
           id: sellerId,
-          name: (session?.user as any)?.name || "Merchant",
+          name: (session.user as any)?.name || "Merchant",
           role: "SELLER",
         },
         reason
@@ -74,7 +101,7 @@ export async function PUT(
     if (action === "CANCEL_ORDER") {
       const res = await orderService.requestCancellation(orderId, reason, {
         id: sellerId,
-        name: (session?.user as any)?.name || "Merchant",
+        name: (session.user as any)?.name || "Merchant",
         role: "SELLER",
       });
       return NextResponse.json(res);
@@ -93,14 +120,11 @@ export async function PUT(
       return NextResponse.json({ success: false, error: "Item not found in order" }, { status: 404 });
     }
 
-    if (session?.user) {
-      const role = (session.user as any).role;
-      if (role !== "ADMIN" && targetItem.sellerId !== sellerId) {
-        return NextResponse.json(
-          { success: false, error: "Forbidden: You cannot modify merchandise from another seller." },
-          { status: 403 }
-        );
-      }
+    if (role !== "ADMIN" && targetItem.sellerId !== sellerId) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: You cannot modify merchandise from another seller." },
+        { status: 403 }
+      );
     }
 
     const updated = await orderService.updateItemFulfillmentStatus(

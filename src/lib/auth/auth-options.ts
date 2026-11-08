@@ -1,4 +1,4 @@
-import { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "./password";
@@ -20,7 +20,7 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email", placeholder: "you@example.com" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials: any) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Email and password are required.");
         }
@@ -53,9 +53,13 @@ export const authOptions: NextAuthOptions = {
             }
 
             // Verify password
-            const isValid = await verifyPassword(credentials.password, user.password);
-            if (!isValid) {
-              // Also check for demo convenience if password is standard "password123"
+            if (user.password) {
+              const isValid = await verifyPassword(credentials.password, user.password);
+              if (!isValid) {
+                throw new Error("Invalid email or password.");
+              }
+            } else {
+              // Only accounts explicitly without a password hash (e.g., initial seed data) can use default password123
               if (credentials.password !== "password123") {
                 throw new Error("Invalid email or password.");
               }

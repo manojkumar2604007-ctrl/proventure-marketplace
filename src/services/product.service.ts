@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { MOCK_PRODUCTS } from "@/lib/db/mock-data";
-import { Product, ProductFilterParams, ProductStatus, SellerProfile, ProductImage } from "@/types";
+import type { Product, ProductFilterParams, ProductStatus, SellerProfile, ProductImage } from "@/types";
 
 // In-memory working copy for local dev updates or offline fallback
 let localProducts: Product[] = [...MOCK_PRODUCTS];
@@ -379,7 +379,7 @@ export const productService = {
 
   async createProduct(data: {
     title: string;
-    slug: string;
+    slug?: string;
     description: string;
     shortDescription?: string | null;
     price: number;
@@ -393,10 +393,11 @@ export const productService = {
     categoryId: string;
     imageUrl?: string;
   }): Promise<Product> {
+    const slug = data.slug || data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const newProduct: Product = {
       id: `prod_${Date.now()}`,
       title: data.title,
-      slug: data.slug,
+      slug,
       description: data.description,
       shortDescription: data.shortDescription,
       price: data.price,

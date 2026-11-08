@@ -1,5 +1,5 @@
 import { MOCK_ORDERS } from "@/lib/db/mock-data";
-import {
+import type {
   Order,
   OrderItem,
   OrderStatus,

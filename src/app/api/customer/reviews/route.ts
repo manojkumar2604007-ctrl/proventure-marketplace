@@ -6,7 +6,13 @@ import { reviewService } from "@/services/review.service";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_customer_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to view your reviews." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
 
     const reviews = await reviewService.getUserReviews(userId);
 

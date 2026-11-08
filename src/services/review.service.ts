@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
-import { Review, Product } from "@/types";
+import type { Review, Product } from "@/types";
 import { MOCK_REVIEWS, MOCK_PRODUCTS, MOCK_ORDERS } from "@/lib/db/mock-data";
 
 let localReviews: Review[] = [...MOCK_REVIEWS];
@@ -269,10 +269,13 @@ export const reviewService = {
       }
     }
 
-    // If no strict delivered order found in mock data, allow verified demo purchase
+    // If no delivered order found for this user and product, user is not eligible to review
     if (!matchingOrderItemId) {
-      matchingOrderItemId = `orditem_verified_${productId}`;
-      matchingOrderId = `ord_verified_demo`;
+      return {
+        eligible: false,
+        alreadyReviewed: false,
+        reason: "Only verified purchasers with delivered orders can submit a review.",
+      };
     }
 
     // Check duplicate in localReviews

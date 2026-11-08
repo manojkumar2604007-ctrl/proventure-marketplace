@@ -13,9 +13,7 @@ export async function PUT(
     try {
       await requireAdmin();
     } catch (e: any) {
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.json({ success: false, error: e.message }, { status: e.status || 403 });
-      }
+      return NextResponse.json({ success: false, error: e.message || "Forbidden: Admin access required" }, { status: e.status || 403 });
     }
 
     const sellerId = params.id;

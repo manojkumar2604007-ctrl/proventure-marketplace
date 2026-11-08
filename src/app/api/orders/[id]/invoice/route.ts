@@ -9,27 +9,31 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to download your invoice." },
+        { status: 401 }
+      );
+    }
     const orderId = params.id;
 
     // Ownership check
-    if (session?.user) {
-      const userId = (session.user as any).id;
-      const role = (session.user as any).role;
-      const sellerProfileId = (session.user as any).sellerProfileId;
+    const userId = (session.user as any).id;
+    const role = (session.user as any).role;
+    const sellerProfileId = (session.user as any).sellerProfileId;
 
-      const check = await orderService.verifyOrderOwnership(
-        orderId,
-        userId,
-        role,
-        sellerProfileId
+    const check = await orderService.verifyOrderOwnership(
+      orderId,
+      userId,
+      role,
+      sellerProfileId
+    );
+
+    if (!check.authorized) {
+      return NextResponse.json(
+        { success: false, error: check.error || "Access denied" },
+        { status: 403 }
       );
-
-      if (!check.authorized) {
-        return NextResponse.json(
-          { success: false, error: check.error || "Access denied" },
-          { status: 403 }
-        );
-      }
     }
 
     const invoice = await orderService.generateInvoiceData(orderId);

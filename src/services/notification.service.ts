@@ -6,7 +6,7 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { NotificationType } from "@prisma/client";
-import { sendEmailInBackground, SendEmailOptions } from "./email.service";
+import { sendEmailInBackground, type SendEmailOptions } from "./email.service";
 
 export interface NotificationRecord {
   id: string;

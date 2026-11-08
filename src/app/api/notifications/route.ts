@@ -12,7 +12,13 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = session?.user?.id || (session?.user as any)?.email || "usr_customer_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
+    }
+    const userId = session.user.id || (session.user as any).email;
 
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "20", 10);
@@ -44,12 +50,19 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const callerId = session?.user?.id;
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
+    }
+    const callerId = session.user.id;
+    const callerRole = (session.user as any).role;
 
     const body = await req.json();
     const { userId, title, message, type, data } = body;
 
-    const targetUserId = userId || callerId || "usr_customer_1";
+    const targetUserId = (callerRole === "ADMIN" ? (userId || callerId) : callerId);
 
     if (!title || !message) {
       return NextResponse.json(

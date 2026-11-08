@@ -6,7 +6,13 @@ import { prisma } from "@/lib/db/prisma";
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_customer_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
 
     const body = await request.json().catch(() => ({}));
     const { productId, moveAll } = body;

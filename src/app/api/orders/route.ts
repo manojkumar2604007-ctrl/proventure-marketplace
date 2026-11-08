@@ -9,46 +9,54 @@ import { dbTransactionService } from "@/services/db-transaction.service";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to view orders." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get("customerId");
     const sellerId = searchParams.get("sellerId");
+    const userRole = (session.user as any).role;
+    const userId = (session.user as any).id;
 
-    // Server-side ownership validation for Customer role
-    if (session?.user) {
-      const userRole = (session.user as any).role;
-      const userId = (session.user as any).id;
-
-      if (userRole === "CUSTOMER") {
-        // Customer can only view their own orders
-        const targetId = customerId || userId;
-        if (customerId && customerId !== userId) {
-          return NextResponse.json(
-            { success: false, error: "Access denied. You can only view your own orders." },
-            { status: 403 }
-          );
-        }
-        const orders = await orderService.getCustomerOrders(targetId);
-        return NextResponse.json({ success: true, data: orders });
+    if (userRole === "CUSTOMER") {
+      // Customer can only view their own orders
+      const targetId = customerId || userId;
+      if (customerId && customerId !== userId) {
+        return NextResponse.json(
+          { success: false, error: "Access denied. You can only view your own orders." },
+          { status: 403 }
+        );
       }
-
-      if (userRole === "SELLER") {
-        const targetSeller = sellerId || (session.user as any).sellerProfileId || userId;
-        const orders = await orderService.getSellerOrders(targetSeller);
-        return NextResponse.json({ success: true, data: orders });
-      }
+      const orders = await orderService.getCustomerOrders(targetId);
+      return NextResponse.json({ success: true, data: orders });
     }
 
-    // Default: for demo/admin queries
-    let orders;
-    if (customerId) {
-      orders = await orderService.getCustomerOrders(customerId);
-    } else if (sellerId) {
-      orders = await orderService.getSellerOrders(sellerId);
-    } else {
-      orders = await orderService.getAllOrders();
+    if (userRole === "SELLER") {
+      const targetSeller = (session.user as any).sellerProfileId || (session.user as any).storeId || userId;
+      const orders = await orderService.getSellerOrders(targetSeller);
+      return NextResponse.json({ success: true, data: orders });
     }
 
-    return NextResponse.json({ success: true, data: orders });
+    if (userRole === "ADMIN") {
+      let orders;
+      if (customerId) {
+        orders = await orderService.getCustomerOrders(customerId);
+      } else if (sellerId) {
+        orders = await orderService.getSellerOrders(sellerId);
+      } else {
+        orders = await orderService.getAllOrders();
+      }
+      return NextResponse.json({ success: true, data: orders });
+    }
+
+    return NextResponse.json(
+      { success: false, error: "Forbidden: Access denied." },
+      { status: 403 }
+    );
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error.message || "Failed to fetch orders" },
@@ -97,19 +105,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. User Identity Binding & Ownership Guard
-    const userId = (session?.user as any)?.id || body.customerId || "usr_customer_1";
-    const customerName = (session?.user as any)?.name || shippingAddress.fullName || "Valued Customer";
-    const customerEmail = (session?.user as any)?.email || body.customerEmail || "customer@example.com";
-
-    if (session?.user) {
-      const sessionUserId = (session.user as any).id;
-      if (body.customerId && body.customerId !== sessionUserId && (session.user as any).role !== "ADMIN") {
-        return NextResponse.json(
-          { success: false, error: "Forbidden: Cannot place orders on behalf of another user" },
-          { status: 403 }
-        );
-      }
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to place an order." },
+        { status: 401 }
+      );
     }
+
+    const sessionUserId = (session.user as any).id;
+    const sessionUserRole = (session.user as any).role;
+    const userId = (sessionUserRole === "ADMIN" && body.customerId) ? body.customerId : sessionUserId;
+    const customerName = (session.user as any).name || shippingAddress.fullName || "Valued Customer";
+    const customerEmail = (session.user as any).email || body.customerEmail || "customer@example.com";
 
     // 4. Payment Integrity & Idempotency Protection
     const isCod = paymentMethod.toLowerCase() === "cod";

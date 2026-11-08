@@ -64,14 +64,23 @@ export const dbTransactionService = {
             );
           }
 
-          // Atomic decrement to prevent race conditions & overselling
-          await tx.inventory.update({
-            where: { id: inventory.id },
+          // Atomic decrement with condition to prevent race conditions & overselling
+          const updatedStock = await tx.inventory.updateMany({
+            where: {
+              id: inventory.id,
+              quantity: { gte: item.quantity },
+            },
             data: {
               quantity: { decrement: item.quantity },
               reserved: { increment: item.quantity },
             },
           });
+
+          if (updatedStock.count === 0) {
+            throw new Error(
+              `Insufficient stock for "${item.title}". Another customer completed checkout simultaneously.`
+            );
+          }
         }
       }
 

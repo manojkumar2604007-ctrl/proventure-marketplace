@@ -7,7 +7,13 @@ import { productService } from "@/services/product.service";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_customer_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to view your wishlist." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
 
     if (process.env.DATABASE_URL && process.env.NEXT_PUBLIC_USE_MOCK_FALLBACK !== "true") {
       const wishlist = await prisma.wishlist.findUnique({
@@ -59,7 +65,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_customer_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to manage your wishlist." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
 
     const body = await request.json();
     const { productId } = body;
@@ -108,7 +120,13 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_customer_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to manage your wishlist." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
 
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get("productId");

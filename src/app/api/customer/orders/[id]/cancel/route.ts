@@ -12,11 +12,10 @@ export async function POST(
     const orderId = params.id;
 
     if (!session?.user) {
-      // In demo mode without active session, fallback to order verification
-      const body = await request.json().catch(() => ({}));
-      const reason = body.reason || "Customer requested cancellation";
-      const result = await orderService.requestCancellation(orderId, reason);
-      return NextResponse.json(result, { status: result.success ? 200 : 400 });
+      return NextResponse.json(
+        { success: false, message: "Unauthorized: Please sign in to cancel your order." },
+        { status: 401 }
+      );
     }
 
     const userId = (session.user as any).id;

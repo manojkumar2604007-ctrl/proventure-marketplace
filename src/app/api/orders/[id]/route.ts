@@ -10,6 +10,12 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to view order details." },
+        { status: 401 }
+      );
+    }
     const orderId = params.id;
 
     const order = await orderService.getOrderById(orderId);
@@ -21,24 +27,22 @@ export async function GET(
     }
 
     // Server-side ownership validation
-    if (session?.user) {
-      const userId = (session.user as any).id;
-      const role = (session.user as any).role;
-      const sellerProfileId = (session.user as any).sellerProfileId;
+    const userId = (session.user as any).id;
+    const role = (session.user as any).role;
+    const sellerProfileId = (session.user as any).sellerProfileId;
 
-      const check = await orderService.verifyOrderOwnership(
-        orderId,
-        userId,
-        role,
-        sellerProfileId
+    const check = await orderService.verifyOrderOwnership(
+      orderId,
+      userId,
+      role,
+      sellerProfileId
+    );
+
+    if (!check.authorized) {
+      return NextResponse.json(
+        { success: false, error: check.error || "Access denied" },
+        { status: 403 }
       );
-
-      if (!check.authorized) {
-        return NextResponse.json(
-          { success: false, error: check.error || "Access denied" },
-          { status: 403 }
-        );
-      }
     }
 
     return NextResponse.json({ success: true, data: order });
@@ -56,6 +60,12 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to update order status." },
+        { status: 401 }
+      );
+    }
     const orderId = params.id;
 
     const existingOrder = await orderService.getOrderById(orderId);
@@ -76,9 +86,9 @@ export async function PATCH(
       );
     }
 
-    const userId = (session?.user as any)?.id || "usr_operator";
-    const userRole = (session?.user as any)?.role || "ADMIN";
-    const userName = (session?.user as any)?.name || "Operator";
+    const userId = (session.user as any).id;
+    const userRole = (session.user as any).role;
+    const userName = (session.user as any).name || "Operator";
 
     // Strict Security & Role Guard
     const transitionCheck = orderService.validateStatusTransition(

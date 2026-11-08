@@ -9,7 +9,22 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const sellerId = (session?.user as any)?.sellerProfileId || "seller_technexus";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
+    }
+
+    const role = (session.user as any).role;
+    if (role !== "SELLER" && role !== "ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Only authorized merchants can access product details." },
+        { status: 403 }
+      );
+    }
+
+    const sellerId = (session.user as any).sellerProfileId || (session.user as any).storeId || (session.user as any).id;
     const productId = params.id;
 
     const product = await productService.getProductById(productId);
@@ -17,14 +32,11 @@ export async function GET(
       return NextResponse.json({ success: false, error: "Product not found" }, { status: 404 });
     }
 
-    if (session?.user) {
-      const role = (session.user as any).role;
-      if (role !== "ADMIN" && product.sellerId !== sellerId) {
-        return NextResponse.json(
-          { success: false, error: "Forbidden: You cannot access another merchant's product." },
-          { status: 403 }
-        );
-      }
+    if (role !== "ADMIN" && product.sellerId !== sellerId) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: You cannot access another merchant's product." },
+        { status: 403 }
+      );
     }
 
     return NextResponse.json({ success: true, data: product });
@@ -42,7 +54,22 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const sellerId = (session?.user as any)?.sellerProfileId || "seller_technexus";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
+    }
+
+    const role = (session.user as any).role;
+    if (role !== "SELLER" && role !== "ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Only authorized merchants can update products." },
+        { status: 403 }
+      );
+    }
+
+    const sellerId = (session.user as any).sellerProfileId || (session.user as any).storeId || (session.user as any).id;
     const productId = params.id;
 
     const existing = await productService.getProductById(productId);
@@ -50,14 +77,11 @@ export async function PUT(
       return NextResponse.json({ success: false, error: "Product not found" }, { status: 404 });
     }
 
-    if (session?.user) {
-      const role = (session.user as any).role;
-      if (role !== "ADMIN" && existing.sellerId !== sellerId) {
-        return NextResponse.json(
-          { success: false, error: "Forbidden: You cannot modify another merchant's product." },
-          { status: 403 }
-        );
-      }
+    if (role !== "ADMIN" && existing.sellerId !== sellerId) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: You cannot modify another merchant's product." },
+        { status: 403 }
+      );
     }
 
     const updates = await request.json();
@@ -78,7 +102,22 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const sellerId = (session?.user as any)?.sellerProfileId || "seller_technexus";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in." },
+        { status: 401 }
+      );
+    }
+
+    const role = (session.user as any).role;
+    if (role !== "SELLER" && role !== "ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: Only authorized merchants can delete products." },
+        { status: 403 }
+      );
+    }
+
+    const sellerId = (session.user as any).sellerProfileId || (session.user as any).storeId || (session.user as any).id;
     const productId = params.id;
 
     const existing = await productService.getProductById(productId);
@@ -86,14 +125,11 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: "Product not found" }, { status: 404 });
     }
 
-    if (session?.user) {
-      const role = (session.user as any).role;
-      if (role !== "ADMIN" && existing.sellerId !== sellerId) {
-        return NextResponse.json(
-          { success: false, error: "Forbidden: You cannot delete another merchant's product." },
-          { status: 403 }
-        );
-      }
+    if (role !== "ADMIN" && existing.sellerId !== sellerId) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: You cannot delete another merchant's product." },
+        { status: 403 }
+      );
     }
 
     const deleted = await productService.deleteProduct(productId);

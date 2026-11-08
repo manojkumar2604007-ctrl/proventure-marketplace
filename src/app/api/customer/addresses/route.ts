@@ -54,7 +54,13 @@ let inMemoryAddresses: Array<{
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_cust_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to manage addresses." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
 
     // Try fetching from database if available
     try {
@@ -82,7 +88,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_cust_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to manage addresses." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
     const body = await request.json();
 
     const { fullName, phone, street, city, state, postalCode, country = "India", isDefault = false, type = "SHIPPING" } = body;
@@ -158,7 +170,13 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_cust_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to manage addresses." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
     const body = await request.json();
     const { id, ...updates } = body;
 
@@ -220,7 +238,13 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_cust_1";
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Please sign in to manage addresses." },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

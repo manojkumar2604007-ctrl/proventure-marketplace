@@ -2,7 +2,7 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import { orderService } from "./order.service";
 import { prisma } from "../lib/db/prisma";
-import { PaymentStatus, OrderStatus } from "../types";
+import type { PaymentStatus, OrderStatus } from "../types";
 
 export interface RazorpayOrderResponse {
   id: string;
@@ -163,19 +163,10 @@ export const paymentService = {
       const signatureBuffer = Buffer.from(razorpaySignature, "utf8");
 
       if (expectedBuffer.length !== signatureBuffer.length) {
-        // In mock mode, if signature is a test simulated token, validate format
-        if (keySecret.includes("mock") && razorpaySignature.startsWith("sig_test_")) {
-          return true;
-        }
         return false;
       }
 
-      const isValid = crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
-      if (!isValid && keySecret.includes("mock") && razorpaySignature.startsWith("sig_test_")) {
-        return true;
-      }
-
-      return isValid;
+      return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
     } catch (err) {
       console.error("Signature verification error:", err);
       return false;
