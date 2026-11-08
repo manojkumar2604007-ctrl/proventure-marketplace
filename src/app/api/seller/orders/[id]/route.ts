@@ -53,7 +53,32 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { itemId, fulfillmentStatus, trackingNumber } = body;
+    const { itemId, fulfillmentStatus, trackingNumber, carrier, action, approved, reason } = body;
+
+    // Support resolution of return requests
+    if (action === "RESOLVE_RETURN") {
+      const res = await orderService.resolveReturn(
+        orderId,
+        approved ?? true,
+        {
+          id: sellerId,
+          name: (session?.user as any)?.name || "Merchant",
+          role: "SELLER",
+        },
+        reason
+      );
+      return NextResponse.json(res);
+    }
+
+    // Support acceptance of cancellation
+    if (action === "CANCEL_ORDER") {
+      const res = await orderService.requestCancellation(orderId, reason, {
+        id: sellerId,
+        name: (session?.user as any)?.name || "Merchant",
+        role: "SELLER",
+      });
+      return NextResponse.json(res);
+    }
 
     if (!itemId || !fulfillmentStatus) {
       return NextResponse.json(
@@ -82,7 +107,14 @@ export async function PUT(
       orderId,
       itemId,
       fulfillmentStatus,
-      trackingNumber
+      trackingNumber,
+      carrier,
+      {
+        id: sellerId,
+        name: (session?.user as any)?.name || "Merchant Dispatcher",
+        role: "SELLER",
+        sellerProfileId: sellerId,
+      }
     );
 
     return NextResponse.json({ success: true, data: updated });

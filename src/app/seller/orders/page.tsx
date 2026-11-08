@@ -145,21 +145,33 @@ export default function SellerOrdersPage() {
 
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto text-xs pb-1 sm:pb-0">
           <span className="text-muted-foreground text-xs font-medium mr-1">Status:</span>
-          {["ALL", "PENDING", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"].map(
-            (st) => (
-              <button
-                key={st}
-                onClick={() => setFilterStatus(st)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-                  filterStatus === st
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-surface hover:bg-muted text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {st}
-              </button>
-            )
-          )}
+          {[
+            "ALL",
+            "PENDING",
+            "CONFIRMED",
+            "PROCESSING",
+            "SHIPPED",
+            "DELIVERED",
+            "RETURN_REQUESTED",
+            "RETURNED",
+            "CANCELLED",
+          ].map((st) => (
+            <button
+              key={st}
+              onClick={() => setFilterStatus(st)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                filterStatus === st
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-surface hover:bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {st === "RETURN_REQUESTED"
+                ? "Returns Pending"
+                : st === "RETURNED"
+                ? "Returned"
+                : st}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -195,12 +207,21 @@ export default function SellerOrdersPage() {
                           ? "info"
                           : order.status === "CANCELLED"
                           ? "destructive"
-                          : "warning"
+                          : order.status === "RETURN_REQUESTED"
+                          ? "warning"
+                          : order.status === "RETURNED"
+                          ? "outline"
+                          : "secondary"
                       }
                       className="text-[10px]"
                     >
                       {order.status}
                     </Badge>
+                    {order.refundStatus && (
+                      <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
+                        Refund: {order.refundStatus}
+                      </Badge>
+                    )}
                     <span className="text-xs text-muted-foreground">
                       Placed: {formatDate(order.createdAt)}
                     </span>
@@ -237,6 +258,23 @@ export default function SellerOrdersPage() {
                     <span>Payment: <strong className="text-emerald-600">{order.paymentStatus}</strong></span>
                   </div>
                 </div>
+
+                {/* Return Request Banner if applicable */}
+                {order.status === "RETURN_REQUESTED" && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs">
+                    <div className="flex items-center gap-2 text-amber-700">
+                      <RotateCcw className="h-4 w-4 shrink-0" />
+                      <span>
+                        <strong>Return Requested:</strong> {order.returnReason || "Customer requested product return"}.
+                      </span>
+                    </div>
+                    <Link href={`/seller/orders/${order.id}`}>
+                      <Button size="sm" className="text-xs h-7 font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0">
+                        Review &amp; Resolve Return
+                      </Button>
+                    </Link>
+                  </div>
+                )}
 
                 {/* Line Items for this Seller */}
                 <div className="divide-y divide-border/40">

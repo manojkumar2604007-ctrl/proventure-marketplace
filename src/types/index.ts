@@ -167,6 +167,19 @@ export interface OrderItem {
   seller?: Partial<SellerProfile>;
 }
 
+export interface OrderStatusHistoryItem {
+  id: string;
+  orderId: string;
+  orderItemId?: string | null;
+  previousStatus: OrderStatus | null;
+  newStatus: OrderStatus;
+  changedBy: string;
+  changedByName?: string | null;
+  changedByRole?: "CUSTOMER" | "SELLER" | "ADMIN" | "SYSTEM" | string | null;
+  description?: string | null;
+  timestamp: string | Date;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
@@ -183,6 +196,11 @@ export interface Order {
   billingAddress?: ShippingAddress;
   notes?: string | null;
   items: OrderItem[];
+  statusHistory?: OrderStatusHistoryItem[];
+  cancellationReason?: string | null;
+  returnReason?: string | null;
+  refundStatus?: "NONE" | "REQUESTED" | "APPROVED" | "PROCESSED" | "REJECTED";
+  refundAmount?: number | null;
   createdAt: string | Date;
   updatedAt?: string | Date;
 }

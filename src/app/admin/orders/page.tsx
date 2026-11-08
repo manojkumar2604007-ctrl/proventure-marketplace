@@ -132,7 +132,18 @@ export default function AdminOrdersPage() {
 
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto text-xs pb-1 sm:pb-0">
           <span className="text-slate-400 text-xs font-medium mr-1">Status:</span>
-          {["ALL", "PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"].map((st) => (
+          {[
+            "ALL",
+            "PENDING",
+            "CONFIRMED",
+            "PROCESSING",
+            "SHIPPED",
+            "DELIVERED",
+            "RETURN_REQUESTED",
+            "RETURNED",
+            "CANCELLED",
+            "REFUNDED",
+          ].map((st) => (
             <button
               key={st}
               onClick={() => {
@@ -145,7 +156,9 @@ export default function AdminOrdersPage() {
                   : "bg-slate-800 text-slate-400 hover:text-white"
               }`}
             >
-              {st}
+              {st === "RETURN_REQUESTED"
+                ? "Disputes / Returns"
+                : st}
             </button>
           ))}
         </div>
@@ -205,26 +218,42 @@ export default function AdminOrdersPage() {
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <span className="text-emerald-400 font-semibold flex items-center gap-1 text-[11px]">
-                        <ShieldCheck className="h-3 w-3" /> {ord.paymentStatus}
-                      </span>
+                      <div className="space-y-1">
+                        <span className="text-emerald-400 font-semibold flex items-center gap-1 text-[11px]">
+                          <ShieldCheck className="h-3 w-3" /> {ord.paymentStatus}
+                        </span>
+                        {ord.refundStatus && (
+                          <Badge variant="outline" className="text-[9px] py-0 border-amber-500/40 text-amber-400">
+                            Refund: {ord.refundStatus}
+                          </Badge>
+                        )}
+                      </div>
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <Badge
-                        variant={
-                          ord.status === "DELIVERED"
-                            ? "success"
-                            : ord.status === "SHIPPED"
-                            ? "info"
-                            : ord.status === "CANCELLED"
-                            ? "destructive"
-                            : "warning"
-                        }
-                        className="text-[10px]"
-                      >
-                        {ord.status}
-                      </Badge>
+                      <div className="space-y-1">
+                        <Badge
+                          variant={
+                            ord.status === "DELIVERED"
+                              ? "success"
+                              : ord.status === "SHIPPED"
+                              ? "info"
+                              : ord.status === "CANCELLED" || ord.status === "REFUNDED"
+                              ? "destructive"
+                              : ord.status === "RETURN_REQUESTED"
+                              ? "warning"
+                              : "secondary"
+                          }
+                          className="text-[10px]"
+                        >
+                          {ord.status}
+                        </Badge>
+                        {ord.items.some((i) => i.trackingNumber) && (
+                          <span className="text-[10px] text-blue-400 flex items-center gap-1 font-mono">
+                            <Truck className="h-2.5 w-2.5" /> AWB Assigned
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="py-3.5 px-4 text-right">

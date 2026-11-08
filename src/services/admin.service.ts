@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { MOCK_USERS, MOCK_SELLERS, MOCK_ORDERS, MOCK_PRODUCTS } from "@/lib/db/mock-data";
-import { User, SellerProfile, Order, Product, Role } from "@/types";
+import { User, SellerProfile, Order, Product, Role, OrderStatus } from "@/types";
+import { orderService } from "./order.service";
 
 export interface AdminUserRecord extends User {
   status: "ACTIVE" | "SUSPENDED" | "PENDING_VERIFICATION";
@@ -268,20 +269,83 @@ export const adminService = {
   async resolveDispute(
     orderId: string,
     resolution: "REFUND_BUYER" | "RELEASE_TO_SELLER" | "CANCELLED",
-    notes: string
+    notes: string,
+    adminUser?: { id: string; name: string; role: Role }
   ): Promise<{ success: boolean; message: string }> {
-    const order = MOCK_ORDERS.find((o) => o.id === orderId);
-    if (!order) return { success: false, message: "Order not found" };
+    const admin = adminUser || {
+      id: "usr_admin_1",
+      name: "Alex Vane (Super Admin)",
+      role: "ADMIN" as Role,
+    };
 
-    if (resolution === "REFUND_BUYER") {
-      order.status = "REFUNDED";
-      order.paymentStatus = "REFUNDED";
-    } else if (resolution === "CANCELLED") {
-      order.status = "CANCELLED";
+    let prevStatus: OrderStatus = "PENDING";
+    let newStatus: OrderStatus = "PENDING";
+
+    try {
+      if (process.env.DATABASE_URL && process.env.NEXT_PUBLIC_USE_MOCK_FALLBACK !== "true") {
+        const existing = await prisma.order.findUnique({ where: { id: orderId } });
+        if (existing) {
+          prevStatus = existing.status as OrderStatus;
+          newStatus =
+            resolution === "REFUND_BUYER"
+              ? "REFUNDED"
+              : resolution === "CANCELLED"
+              ? "CANCELLED"
+              : (existing.status as OrderStatus);
+
+          await prisma.order.update({
+            where: { id: orderId },
+            data: {
+              status: newStatus,
+              paymentStatus: resolution === "REFUND_BUYER" ? "REFUNDED" : existing.paymentStatus,
+              notes: resolution === "REFUND_BUYER" ? `Refund Processed: ${existing.total} INR. Rationale: ${notes}` : existing.notes,
+            },
+          });
+
+          await orderService.recordStatusHistory(orderId, {
+            previousStatus: prevStatus,
+            newStatus,
+            changedBy: admin.id,
+            changedByName: admin.name,
+            changedByRole: admin.role,
+            description: `Admin Dispute Mediation: ${resolution}. Rationale: ${notes}`,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("DB dispute resolution fallback:", e);
+    }
+
+    const order = MOCK_ORDERS.find((o) => o.id === orderId);
+    if (order) {
+      prevStatus = order.status;
+      if (resolution === "REFUND_BUYER") {
+        newStatus = "REFUNDED";
+        order.status = "REFUNDED";
+        order.paymentStatus = "REFUNDED";
+        order.refundStatus = "PROCESSED";
+        order.refundAmount = order.total;
+      } else if (resolution === "CANCELLED") {
+        newStatus = "CANCELLED";
+        order.status = "CANCELLED";
+        order.refundStatus = "PROCESSED";
+        order.refundAmount = order.total;
+      } else {
+        newStatus = order.status;
+      }
+
+      await orderService.recordStatusHistory(orderId, {
+        previousStatus: prevStatus,
+        newStatus,
+        changedBy: admin.id,
+        changedByName: admin.name,
+        changedByRole: admin.role,
+        description: `Admin Dispute Mediation: ${resolution}. Rationale: ${notes}`,
+      });
     }
 
     this.recordAuditLog({
-      adminName: "Alex Vane (Super Admin)",
+      adminName: admin.name,
       action: "DISPUTE_RESOLVED",
       entityType: "Order",
       entityId: orderId,
@@ -290,7 +354,7 @@ export const adminService = {
 
     return {
       success: true,
-      message: `Dispute for order ${order.orderNumber} successfully resolved with outcome: ${resolution}.`,
+      message: `Dispute for order ${order?.orderNumber || orderId} successfully resolved with outcome: ${resolution}.`,
     };
   },
 };

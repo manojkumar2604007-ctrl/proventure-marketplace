@@ -128,13 +128,42 @@ export default function SellerOrderDetailPage() {
   };
 
   const handleApproveReturn = async () => {
-    const res = await orderService.requestReturn(order.id, "Return inspected & accepted by seller");
+    setIsUpdating(true);
+    const res = await orderService.resolveReturn(order.id, true, {
+      id: sellerId,
+      name: "TechNexus Fulfillment",
+      role: "SELLER",
+    });
+    setIsUpdating(false);
     if (res.success && res.order) {
       setOrder({ ...res.order });
       addToast({
-        title: "Return Processed",
-        description: "Return accepted and refund credited to buyer.",
+        title: "Return Approved",
+        description: res.message,
         type: "success",
+      });
+    }
+  };
+
+  const handleDeclineReturn = async () => {
+    setIsUpdating(true);
+    const res = await orderService.resolveReturn(
+      order.id,
+      false,
+      {
+        id: sellerId,
+        name: "TechNexus Fulfillment",
+        role: "SELLER",
+      },
+      "Inspection failed: Packaging torn or missing accessories."
+    );
+    setIsUpdating(false);
+    if (res.success && res.order) {
+      setOrder({ ...res.order });
+      addToast({
+        title: "Return Declined",
+        description: res.message,
+        type: "default",
       });
     }
   };
@@ -408,19 +437,78 @@ export default function SellerOrderDetailPage() {
           <div>
             <span className="font-bold text-foreground block">Customer Return Inspection</span>
             <span className="text-muted-foreground text-[11px]">
-              If returned merchandise has been received and verified in warehouse, process refund closure.
+              {order.status === "RETURN_REQUESTED"
+                ? `Customer requested return: "${order.returnReason || "Item return requested"}". Review and approve/reject.`
+                : "Manage return requests once submitted by verified buyers."}
             </span>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleApproveReturn}
-            disabled={order.status !== "DELIVERED"}
-            className="text-xs font-bold text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 shrink-0"
-          >
-            Approve Return & Refund
-          </Button>
+          <div className="flex items-center gap-2">
+            {order.status === "RETURN_REQUESTED" ? (
+              <>
+                <Button
+                  size="sm"
+                  onClick={handleApproveReturn}
+                  disabled={isUpdating}
+                  className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                >
+                  Approve Return &amp; Refund
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDeclineReturn}
+                  disabled={isUpdating}
+                  className="text-xs font-semibold text-rose-600 border-rose-300 hover:bg-rose-50 shrink-0"
+                >
+                  Decline Return
+                </Button>
+              </>
+            ) : (
+              <Badge variant="outline" className="text-xs">
+                {order.status === "RETURNED" ? "Return Completed" : "No Pending Return"}
+              </Badge>
+            )}
+          </div>
         </div>
+      </div>
+
+      {/* Order Status History & Audit Trail */}
+      <div className="p-6 rounded-2xl border border-border/80 bg-card shadow-sm space-y-4 text-xs">
+        <h2 className="font-bold text-sm text-foreground flex items-center gap-2">
+          <Clock className="h-4 w-4 text-primary" />
+          Order Status History &amp; Immutable Audit Trail
+        </h2>
+
+        {order.statusHistory && order.statusHistory.length > 0 ? (
+          <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
+            {order.statusHistory.map((item, idx) => (
+              <div key={item.id || idx} className="relative space-y-0.5">
+                <div className="absolute -left-6 top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-card" />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-foreground">
+                    {item.previousStatus ? `${item.previousStatus} ➔ ` : ""}
+                    {item.newStatus}
+                  </span>
+                  <Badge variant="outline" size="sm" className="text-[10px] py-0">
+                    {item.changedByName || item.changedByRole || "System"}
+                  </Badge>
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    {formatDate(item.timestamp)}
+                  </span>
+                </div>
+                {item.description && (
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                    {item.description}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Initial status recorded: {order.status} on {formatDate(order.createdAt)}.
+          </p>
+        )}
       </div>
     </div>
   );

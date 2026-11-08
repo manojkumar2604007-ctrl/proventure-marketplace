@@ -486,6 +486,7 @@ model Order {
   items           OrderItem[]
   payment         Payment?
   reviews         Review[]
+  statusHistory   OrderStatusHistory[]
 
   @@index([userId])
   @@index([orderNumber])
@@ -528,6 +529,28 @@ model OrderItem {
   @@index([orderId])
   @@index([storeId])
   @@index([productId])
+}
+
+// ==========================================
+// 17b. OrderStatusHistory Model
+// ==========================================
+
+model OrderStatusHistory {
+  id             String       @id @default(uuid())
+  orderId        String
+  orderItemId    String?
+  previousStatus OrderStatus?
+  newStatus      OrderStatus
+  changedBy      String       // User ID or "SYSTEM" / "PAYMENT_GATEWAY"
+  changedByName  String?      // Name of actor
+  changedByRole  String?      // "CUSTOMER", "SELLER", "ADMIN", "SYSTEM"
+  description    String?      @db.Text
+  createdAt      DateTime     @default(now())
+
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 // ==========================================
