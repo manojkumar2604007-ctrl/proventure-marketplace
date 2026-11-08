@@ -8,7 +8,9 @@ import { useCartStore } from "@/store/cart-store";
 import { useUIStore } from "@/store/ui-store";
 import { formatPrice } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Heart, ShoppingBag, Trash2, ArrowRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Heart, ShoppingBag, Trash2, ArrowRight, CheckCircle2 } from "lucide-react";
 
 export default function CustomerWishlistPage() {
   const { items, removeItem, clearWishlist } = useWishlistStore();
@@ -37,7 +39,38 @@ export default function CustomerWishlistPage() {
 
     addToast({
       title: "Moved to Cart",
-      description: `${product.title} transferred to your shopping cart.`,
+      description: `${product.title} has been moved to your shopping bag.`,
+      type: "success",
+    });
+
+    openCart();
+  };
+
+  const handleMoveAllToCart = () => {
+    items.forEach((product) => {
+      const primaryImg =
+        product.images?.find((img: any) => img.isPrimary)?.url ||
+        product.images?.[0]?.url ||
+        "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80";
+
+      addItem({
+        id: `${product.id}_default`,
+        productId: product.id,
+        title: product.title,
+        price: product.price,
+        comparePrice: product.comparePrice,
+        image: primaryImg,
+        sellerId: product.sellerId,
+        sellerName: product.seller?.storeName || "Verified Vendor",
+        stock: product.stock,
+      });
+    });
+
+    clearWishlist();
+
+    addToast({
+      title: "All Items Moved to Cart",
+      description: "All wishlist items are now ready for checkout.",
       type: "success",
     });
 
@@ -45,92 +78,115 @@ export default function CustomerWishlistPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between pb-4 border-b">
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/60">
         <div>
-          <h1 className="text-2xl font-black text-foreground tracking-tight">
-            Saved Wishlist
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {items.length} {items.length === 1 ? "saved item" : "saved items"}
+          <h1 className="heading-1">Saved Wishlist</h1>
+          <p className="subheading mt-1">
+            {items.length} {items.length === 1 ? "saved item" : "saved items"} • Save items to track price drops or buy later
           </p>
         </div>
 
         {items.length > 0 && (
-          <button
-            onClick={clearWishlist}
-            className="text-xs text-rose-500 hover:underline font-semibold"
-          >
-            Clear All
-          </button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMoveAllToCart}
+              className="text-xs font-semibold gap-1.5"
+              leftIcon={<ShoppingBag className="h-3.5 w-3.5" />}
+            >
+              Move All to Cart
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearWishlist}
+              className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+            >
+              Clear All
+            </Button>
+          </div>
         )}
       </div>
 
+      {/* Wishlist Items Grid */}
       {items.length === 0 ? (
-        <div className="text-center py-20 border rounded-2xl bg-card p-8 space-y-4">
-          <div className="h-16 w-16 rounded-full bg-rose-50 dark:bg-rose-950/20 text-rose-500 flex items-center justify-center mx-auto">
-            <Heart className="h-8 w-8" />
-          </div>
-          <h3 className="text-base font-bold text-foreground">
-            Your wishlist is empty
-          </h3>
-          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-            Explore the marketplace catalog and tap the heart icon on any product to save it for later.
-          </p>
-          <Link href="/products">
-            <Button size="sm" className="text-xs">
-              Explore Products
-            </Button>
-          </Link>
-        </div>
+        <EmptyState
+          icon={<Heart className="h-7 w-7 text-rose-500" />}
+          title="Your Wishlist is Empty"
+          description="Explore our curated multi-vendor catalog and click the heart icon on any product to save it here for later."
+          actionLabel="Explore Marketplace Catalog"
+          actionHref="/products"
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {items.map((prod) => {
             const primaryImg =
-              prod.images?.find((img) => img.isPrimary)?.url ||
+              prod.images?.find((img: any) => img.isPrimary)?.url ||
               prod.images?.[0]?.url ||
               "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80";
 
             return (
               <div
                 key={prod.id}
-                className="border rounded-2xl bg-card overflow-hidden shadow-sm flex flex-col justify-between"
+                className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-subtle hover:shadow-card transition-all flex flex-col justify-between"
               >
-                <div className="relative aspect-video w-full bg-muted">
-                  <Image
-                    src={primaryImg}
-                    alt={prod.title}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-cover"
-                  />
+                <div className="relative aspect-video w-full bg-surface">
+                  <Link href={`/products/${prod.slug}`} className="block h-full w-full">
+                    <Image
+                      src={primaryImg}
+                      alt={prod.title}
+                      fill
+                      sizes="(max-width: 640px) 100vw, 300px"
+                      className="object-cover"
+                    />
+                  </Link>
+
                   <button
                     onClick={() => removeItem(prod.id)}
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 hover:bg-background text-rose-500 shadow-sm"
-                    aria-label="Remove from wishlist"
+                    className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-white/90 text-rose-500 hover:bg-white shadow-subtle transition-transform active:scale-95"
+                    aria-label="Remove item"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
 
-                <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
                   <div>
-                    <h4 className="font-bold text-xs text-foreground line-clamp-1">
-                      {prod.title}
-                    </h4>
-                    <span className="text-sm font-black text-foreground block mt-1">
-                      {formatPrice(prod.price)}
+                    <span className="text-[11px] font-medium text-muted-foreground block truncate">
+                      {prod.seller?.storeName || "Verified Vendor"}
                     </span>
+                    <Link href={`/products/${prod.slug}`}>
+                      <h3 className="font-bold text-sm text-primary hover:text-secondary transition-colors line-clamp-2 mt-0.5">
+                        {prod.title}
+                      </h3>
+                    </Link>
                   </div>
 
-                  <Button
-                    onClick={() => handleMoveToCart(prod)}
-                    size="sm"
-                    className="w-full text-xs font-semibold gap-1.5 rounded-xl"
-                  >
-                    <ShoppingBag className="h-3.5 w-3.5" />
-                    <span>Move to Cart</span>
-                  </Button>
+                  <div className="pt-2 border-t border-border/60 flex items-center justify-between">
+                    <div>
+                      <span className="text-base font-extrabold text-primary">
+                        {formatPrice(prod.price)}
+                      </span>
+                      {prod.comparePrice && prod.comparePrice > prod.price && (
+                        <span className="text-xs text-muted-foreground line-through ml-2">
+                          {formatPrice(prod.comparePrice)}
+                        </span>
+                      )}
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleMoveToCart(prod)}
+                      className="text-xs font-semibold gap-1.5"
+                    >
+                      <ShoppingBag className="h-3.5 w-3.5" />
+                      <span>Move to Cart</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
             );

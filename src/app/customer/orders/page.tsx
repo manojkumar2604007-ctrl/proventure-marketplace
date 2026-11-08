@@ -1,39 +1,61 @@
 import React from "react";
+import Link from "next/link";
 import { orderService } from "@/services/order.service";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Package, Truck, CheckCircle2, Clock, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Package,
+  Truck,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+  FileText,
+  AlertCircle,
+  RotateCcw,
+} from "lucide-react";
+
+export const revalidate = 0;
 
 export default async function CustomerOrdersPage() {
   const orders = await orderService.getCustomerOrders("usr_customer_1");
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-foreground tracking-tight">
-          Orders & Shipment Tracking
-        </h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Real-time delivery progress for each multi-vendor dispatch
-        </p>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/60">
+        <div>
+          <h1 className="heading-1">My Orders &amp; Shipment Tracking</h1>
+          <p className="subheading mt-1">
+            Track multi-vendor dispatches, download GST invoices, and manage returns.
+          </p>
+        </div>
+        <Link href="/products">
+          <Button size="sm" variant="outline" className="text-xs">
+            Browse More Products
+          </Button>
+        </Link>
       </div>
 
+      {/* Orders List */}
       <div className="space-y-6">
         {orders.map((order) => {
           const isDelivered = order.status === "DELIVERED";
           const isShipped = order.status === "SHIPPED";
           const isProcessing = order.status === "PROCESSING" || order.status === "CONFIRMED";
+          const isCancelled = order.status === "CANCELLED";
+          const isRefunded = order.status === "REFUNDED";
 
           return (
             <div
               key={order.id}
-              className="border rounded-2xl bg-card overflow-hidden shadow-sm space-y-4 p-6"
+              className="rounded-2xl border border-border/80 bg-card p-6 shadow-subtle hover:shadow-card transition-all space-y-5"
             >
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+              {/* Order Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-sm text-foreground">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono font-bold text-base text-primary">
                       Order #{order.orderNumber}
                     </span>
                     <Badge
@@ -42,126 +64,131 @@ export default async function CustomerOrdersPage() {
                           ? "success"
                           : isShipped
                           ? "info"
+                          : isCancelled
+                          ? "destructive"
+                          : isRefunded
+                          ? "outline"
                           : "warning"
                       }
-                      className="text-[11px]"
+                      size="sm"
+                      dot
                     >
                       {order.status}
                     </Badge>
                   </div>
                   <span className="text-xs text-muted-foreground mt-0.5 block">
-                    Placed on {formatDate(order.createdAt)} • Paid via {order.paymentStatus}
+                    Placed on {formatDate(order.createdAt)} • Payment: <strong className="text-foreground">{order.paymentStatus}</strong>
                   </span>
                 </div>
 
-                <div className="text-left sm:text-right">
-                  <span className="text-sm font-black text-foreground">
-                    {formatPrice(order.total)}
-                  </span>
-                  <span className="text-xs text-muted-foreground block">
-                    {order.items.length} {order.items.length === 1 ? "item" : "items"}
-                  </span>
-                </div>
-              </div>
+                <div className="flex items-center gap-4 self-start sm:self-auto">
+                  <div className="text-left sm:text-right">
+                    <span className="text-base font-extrabold text-primary">
+                      {formatPrice(order.total)}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground block">
+                      {order.items.length} {order.items.length === 1 ? "item" : "items"}
+                    </span>
+                  </div>
 
-              {/* Visual Shipment Timeline Tracker */}
-              <div className="py-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3 block">
-                  Delivery Progress
-                </span>
-                <div className="grid grid-cols-4 gap-2 text-center">
-                  <div className="space-y-1">
-                    <div className="h-2 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] font-semibold text-foreground">
-                      Ordered
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <div
-                      className={`h-2 rounded-full ${
-                        isProcessing || isShipped || isDelivered
-                          ? "bg-emerald-500"
-                          : "bg-muted"
-                      }`}
-                    />
-                    <span className="text-[10px] font-semibold text-foreground">
-                      Processing
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <div
-                      className={`h-2 rounded-full ${
-                        isShipped || isDelivered ? "bg-emerald-500" : "bg-muted"
-                      }`}
-                    />
-                    <span className="text-[10px] font-semibold text-foreground">
-                      Shipped
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <div
-                      className={`h-2 rounded-full ${
-                        isDelivered ? "bg-emerald-500" : "bg-muted"
-                      }`}
-                    />
-                    <span className="text-[10px] font-semibold text-foreground">
-                      Delivered
-                    </span>
-                  </div>
+                  <Link href={`/customer/orders/${order.id}`}>
+                    <Button variant="default" size="sm" className="rounded-xl text-xs gap-1 font-semibold">
+                      <span>View Details</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </Link>
                 </div>
               </div>
 
-              {/* Items in this Order */}
-              <div className="border-t pt-4 space-y-3">
+              {/* Delivery Progress Bar */}
+              {!isCancelled && !isRefunded && (
+                <div className="py-1">
+                  <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                    <div className="space-y-1">
+                      <div className="h-2 rounded-full bg-accent" />
+                      <span className="text-[11px] font-bold text-primary">
+                        Confirmed
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <div
+                        className={`h-2 rounded-full ${
+                          isProcessing || isShipped || isDelivered
+                            ? "bg-accent"
+                            : "bg-muted"
+                        }`}
+                      />
+                      <span className="text-[11px] font-medium text-foreground">
+                        Processing
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <div
+                        className={`h-2 rounded-full ${
+                          isShipped || isDelivered ? "bg-accent" : "bg-muted"
+                        }`}
+                      />
+                      <span className="text-[11px] font-medium text-foreground">
+                        In Transit
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <div
+                        className={`h-2 rounded-full ${
+                          isDelivered ? "bg-accent" : "bg-muted"
+                        }`}
+                      />
+                      <span className="text-[11px] font-medium text-foreground">
+                        Delivered
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Order Items Snapshot */}
+              <div className="divide-y divide-border/40">
                 {order.items.map((item) => (
                   <div
                     key={item.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-muted/30 text-xs"
+                    className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                        <Package className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-foreground">{item.title}</p>
-                        {item.variantName && (
-                          <p className="text-[11px] text-muted-foreground">
-                            {item.variantName}
-                          </p>
+                    <div>
+                      <p className="font-bold text-foreground text-sm">{item.title}</p>
+                      <div className="flex items-center gap-2 text-muted-foreground mt-0.5">
+                        <span>Quantity: {item.quantity}</span>
+                        {item.variantName && <span>• Option: {item.variantName}</span>}
+                        {item.trackingNumber && (
+                          <span className="text-secondary font-mono font-semibold">
+                            • {item.carrier}: {item.trackingNumber}
+                          </span>
                         )}
-                        <p className="text-[11px] text-muted-foreground">
-                          Qty: {item.quantity} • {formatPrice(item.price)} each
-                        </p>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-3 sm:text-right">
-                      {item.trackingNumber ? (
-                        <div className="text-[11px]">
-                          <span className="text-muted-foreground block">
-                            Courier: {item.carrier || "BlueDart Express"}
-                          </span>
-                          <span className="font-mono font-bold text-primary">
-                            {item.trackingNumber}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-muted-foreground">
-                          Tracking will update once picked up
-                        </span>
-                      )}
-                    </div>
+                    <span className="font-extrabold text-foreground self-end sm:self-auto">
+                      {formatPrice(item.total)}
+                    </span>
                   </div>
                 ))}
               </div>
 
-              {/* Delivery Address */}
-              <div className="pt-2 flex items-center gap-2 text-xs text-muted-foreground border-t">
-                <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-                <span className="truncate">
-                  Shipping to: {order.shippingAddress.fullName}, {order.shippingAddress.street},{" "}
-                  {order.shippingAddress.city} - {order.shippingAddress.postalCode}
-                </span>
+              {/* Footer Quick Links */}
+              <div className="pt-3 border-t border-border/60 flex flex-wrap items-center justify-between text-xs gap-3">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Truck className="h-4 w-4 text-secondary" />
+                  <span>
+                    Ship to: <strong className="text-foreground">{order.shippingAddress.city}, {order.shippingAddress.postalCode}</strong>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Link href={`/customer/orders/${order.id}`}>
+                    <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                      <FileText className="h-3.5 w-3.5" />
+                      <span>Invoice &amp; Actions</span>
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </div>
           );

@@ -1,15 +1,28 @@
 "use client";
 
-import React, { useState } from "react";
-import { MapPin, Plus, Check, Trash2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { MapPin, Plus, Check, Trash2, Edit2, ShieldCheck, Home, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
+import { Badge } from "@/components/ui/badge";
 import { useUIStore } from "@/store/ui-store";
+
+interface AddressItem {
+  id: string;
+  fullName: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  isDefault: boolean;
+  type?: "Home" | "Office" | "Other";
+}
 
 export default function CustomerAddressesPage() {
   const { addToast } = useUIStore();
-  const [showAdd, setShowAdd] = useState(false);
-  const [addresses, setAddresses] = useState([
+  const [addresses, setAddresses] = useState<AddressItem[]>([
     {
       id: "addr_1",
       fullName: "Priya Sharma",
@@ -19,6 +32,7 @@ export default function CustomerAddressesPage() {
       state: "Karnataka",
       postalCode: "560038",
       isDefault: true,
+      type: "Home",
     },
     {
       id: "addr_2",
@@ -29,213 +43,419 @@ export default function CustomerAddressesPage() {
       state: "Karnataka",
       postalCode: "560103",
       isDefault: false,
+      type: "Office",
     },
   ]);
 
-  const [newFull, setNewFull] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [newStreet, setNewStreet] = useState("");
-  const [newCity, setNewCity] = useState("");
-  const [newState, setNewState] = useState("");
-  const [newPin, setNewPin] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
 
-  const handleAddAddress = (e: React.FormEvent) => {
+  // Sync addresses on mount from API
+  useEffect(() => {
+    fetch("/api/customer/addresses")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setAddresses(
+            json.data.map((item: any) => ({
+              id: item.id,
+              fullName: item.fullName,
+              phone: item.phone,
+              street: item.street,
+              city: item.city,
+              state: item.state,
+              postalCode: item.postalCode,
+              isDefault: Boolean(item.isDefault),
+              type: item.type === "OFFICE" ? "Office" : "Home",
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Form Fields
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("Karnataka");
+  const [postalCode, setPostalCode] = useState("");
+  const [addressType, setAddressType] = useState<"Home" | "Office" | "Other">("Home");
+
+  const openAddModal = () => {
+    setEditingAddressId(null);
+    setFullName("Priya Sharma");
+    setPhone("+91 91234 56789");
+    setStreet("");
+    setCity("Bengaluru");
+    setState("Karnataka");
+    setPostalCode("");
+    setAddressType("Home");
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (addr: AddressItem) => {
+    setEditingAddressId(addr.id);
+    setFullName(addr.fullName);
+    setPhone(addr.phone);
+    setStreet(addr.street);
+    setCity(addr.city);
+    setState(addr.state);
+    setPostalCode(addr.postalCode);
+    setAddressType(addr.type || "Home");
+    setIsModalOpen(true);
+  };
+
+  const handleSaveAddress = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFull || !newPhone || !newStreet || !newCity || !newPin) {
+    if (!fullName || !phone || !street || !city || !postalCode) {
       addToast({
-        title: "Missing Fields",
-        description: "Please fill all required address inputs.",
+        title: "Missing Information",
+        description: "Please complete all mandatory address fields.",
         type: "error",
       });
       return;
     }
 
-    const newEntry = {
-      id: `addr_${Date.now()}`,
-      fullName: newFull,
-      phone: newPhone,
-      street: newStreet,
-      city: newCity,
-      state: newState || "Karnataka",
-      postalCode: newPin,
-      isDefault: false,
-    };
+    if (editingAddressId) {
+      // Edit existing
+      setAddresses((prev) =>
+        prev.map((addr) =>
+          addr.id === editingAddressId
+            ? {
+                ...addr,
+                fullName,
+                phone,
+                street,
+                city,
+                state,
+                postalCode,
+                type: addressType,
+              }
+            : addr
+        )
+      );
 
-    setAddresses([...addresses, newEntry]);
-    setShowAdd(false);
-    setNewFull("");
-    setNewPhone("");
-    setNewStreet("");
-    setNewCity("");
-    setNewPin("");
+      fetch("/api/customer/addresses", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingAddressId,
+          fullName,
+          phone,
+          street,
+          city,
+          state,
+          postalCode,
+          type: addressType === "Office" ? "OFFICE" : "SHIPPING",
+        }),
+      }).catch(() => {});
 
-    addToast({
-      title: "Address Saved",
-      description: "New shipping address added to your address book.",
-      type: "success",
-    });
+      addToast({
+        title: "Address Updated",
+        description: "Your shipping destination has been updated.",
+        type: "success",
+      });
+    } else {
+      // Add new
+      const tempId = `addr_${Date.now()}`;
+      const newAddress: AddressItem = {
+        id: tempId,
+        fullName,
+        phone,
+        street,
+        city,
+        state,
+        postalCode,
+        isDefault: addresses.length === 0,
+        type: addressType,
+      };
+      setAddresses((prev) => [...prev, newAddress]);
+
+      fetch("/api/customer/addresses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName,
+          phone,
+          street,
+          city,
+          state,
+          postalCode,
+          isDefault: addresses.length === 0,
+          type: addressType === "Office" ? "OFFICE" : "SHIPPING",
+        }),
+      })
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success && json.data?.id) {
+            setAddresses((prev) =>
+              prev.map((a) => (a.id === tempId ? { ...a, id: json.data.id } : a))
+            );
+          }
+        })
+        .catch(() => {});
+
+      addToast({
+        title: "New Address Added",
+        description: "Address saved to your address book.",
+        type: "success",
+      });
+    }
+
+    setIsModalOpen(false);
   };
 
-  const setDefault = (id: string) => {
-    setAddresses(
-      addresses.map((a) => ({
-        ...a,
-        isDefault: a.id === id,
-      }))
-    );
+  const handleDeleteAddress = (id: string) => {
+    const target = addresses.find((a) => a.id === id);
+    if (target?.isDefault && addresses.length > 1) {
+      addToast({
+        title: "Cannot Delete Default",
+        description: "Please select another address as default before deleting this one.",
+        type: "error",
+      });
+      return;
+    }
+
+    setAddresses((prev) => prev.filter((a) => a.id !== id));
+    fetch(`/api/customer/addresses?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }).catch(() => {});
+
     addToast({
-      title: "Default Updated",
-      description: "Default delivery destination updated.",
+      title: "Address Deleted",
+      description: "Address removed from your address book.",
       type: "default",
     });
   };
 
+  const handleSetDefault = (id: string) => {
+    setAddresses((prev) =>
+      prev.map((a) => ({
+        ...a,
+        isDefault: a.id === id,
+      }))
+    );
+
+    fetch("/api/customer/addresses", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, isDefault: true }),
+    }).catch(() => {});
+
+    addToast({
+      title: "Default Destination Set",
+      description: "Future checkouts will auto-select this address.",
+      type: "success",
+    });
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between pb-4 border-b">
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/60">
         <div>
-          <h1 className="text-2xl font-black text-foreground tracking-tight">
-            Shipping Address Book
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Manage multiple delivery destinations for frictionless multi-vendor checkout
+          <h1 className="heading-1">Shipping Address Book</h1>
+          <p className="subheading mt-1">
+            Manage your verified home, work, and secondary delivery addresses for fast 1-click checkout.
           </p>
         </div>
 
         <Button
-          onClick={() => setShowAdd(!showAdd)}
+          onClick={openAddModal}
           size="sm"
-          className="text-xs gap-1.5 rounded-xl font-semibold"
+          className="rounded-xl text-xs font-bold gap-1.5 self-start sm:self-auto"
+          leftIcon={<Plus className="h-4 w-4" />}
         >
-          <Plus className="h-4 w-4" />
-          <span>{showAdd ? "Close" : "Add Address"}</span>
+          Add New Address
         </Button>
       </div>
 
-      {showAdd && (
-        <form
-          onSubmit={handleAddAddress}
-          className="p-6 rounded-2xl border bg-muted/30 space-y-4"
-        >
-          <h3 className="text-sm font-bold text-foreground">Add New Address</h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-medium text-foreground block mb-1">
-                Full Name
-              </label>
-              <Input
-                value={newFull}
-                onChange={(e) => setNewFull(e.target.value)}
-                className="text-xs h-9"
-                required
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-foreground block mb-1">
-                Phone Number
-              </label>
-              <Input
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                className="text-xs h-9"
-                required
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-foreground block mb-1">
-                Street Address
-              </label>
-              <Input
-                value={newStreet}
-                onChange={(e) => setNewStreet(e.target.value)}
-                className="text-xs h-9"
-                required
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-foreground block mb-1">
-                City
-              </label>
-              <Input
-                value={newCity}
-                onChange={(e) => setNewCity(e.target.value)}
-                className="text-xs h-9"
-                required
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-foreground block mb-1">
-                Postal Code
-              </label>
-              <Input
-                value={newPin}
-                onChange={(e) => setNewPin(e.target.value)}
-                className="text-xs h-9"
-                required
-              />
-            </div>
-          </div>
-
-          <Button type="submit" size="sm" className="text-xs rounded-xl">
-            Save Address
-          </Button>
-        </form>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Address Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {addresses.map((addr) => (
           <div
             key={addr.id}
-            className={`p-5 rounded-2xl border bg-card flex flex-col justify-between space-y-4 transition-all ${
-              addr.isDefault ? "ring-2 ring-primary border-primary shadow-sm" : ""
+            className={`rounded-2xl border p-6 bg-card shadow-subtle hover:shadow-card transition-all flex flex-col justify-between ${
+              addr.isDefault
+                ? "border-secondary ring-2 ring-secondary/15"
+                : "border-border/80"
             }`}
           >
-            <div className="space-y-1 text-xs">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-foreground">
-                  {addr.fullName}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base text-primary">
+                    {addr.fullName}
+                  </span>
+                  <Badge variant="subtle" size="sm">
+                    {addr.type === "Office" ? (
+                      <Briefcase className="h-3 w-3 mr-1 inline" />
+                    ) : (
+                      <Home className="h-3 w-3 mr-1 inline" />
+                    )}
+                    {addr.type || "Home"}
+                  </Badge>
+                </div>
                 {addr.isDefault && (
-                  <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold text-[10px]">
-                    Default
+                  <Badge variant="success" size="sm" dot>
+                    Default Delivery
+                  </Badge>
+                )}
+              </div>
+
+              <p className="text-xs text-foreground/90 leading-relaxed">
+                {addr.street}
+                <br />
+                {addr.city}, {addr.state} - <strong className="font-mono">{addr.postalCode}</strong>
+              </p>
+
+              <p className="text-xs text-muted-foreground">
+                Phone: <span className="font-mono text-foreground font-semibold">{addr.phone}</span>
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between text-xs">
+              <div>
+                {!addr.isDefault ? (
+                  <button
+                    onClick={() => handleSetDefault(addr.id)}
+                    className="text-secondary hover:underline font-semibold"
+                  >
+                    Set as Default
+                  </button>
+                ) : (
+                  <span className="text-accent font-semibold flex items-center gap-1">
+                    <Check className="h-3.5 w-3.5" /> Primary Destination
                   </span>
                 )}
               </div>
-              <p className="text-muted-foreground leading-relaxed pt-1">
-                {addr.street}
-              </p>
-              <p className="text-muted-foreground">
-                {addr.city}, {addr.state} - {addr.postalCode}
-              </p>
-              <p className="text-muted-foreground pt-1">Phone: {addr.phone}</p>
-            </div>
 
-            <div className="pt-3 border-t flex items-center justify-between text-xs">
-              {!addr.isDefault ? (
-                <button
-                  onClick={() => setDefault(addr.id)}
-                  className="text-xs text-primary hover:underline font-semibold"
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => openEditModal(addr)}
+                  aria-label="Edit address"
                 >
-                  Set as Default
-                </button>
-              ) : (
-                <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                  <Check className="h-3.5 w-3.5" /> Primary Destination
-                </span>
-              )}
-
-              <button
-                onClick={() => setAddresses(addresses.filter((a) => a.id !== addr.id))}
-                className="text-muted-foreground hover:text-rose-500 p-1"
-                aria-label="Delete address"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+                  <Edit2 className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => handleDeleteAddress(addr.id)}
+                  className="hover:text-destructive hover:border-destructive/40"
+                  aria-label="Delete address"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Add / Edit Address Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingAddressId ? "Edit Shipping Address" : "Add New Shipping Address"}
+        description="Ensure address and pin code match official postal records for prompt delivery."
+        footer={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleSaveAddress}
+            >
+              {editingAddressId ? "Save Changes" : "Add Address"}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveAddress} className="space-y-4 py-2">
+          <Input
+            label="Recipient Full Name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="e.g. Priya Sharma"
+            required
+          />
+
+          <Input
+            label="Mobile Contact Number"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+91 98765 43210"
+            required
+          />
+
+          <Input
+            label="Flat / House / Street Address"
+            value={street}
+            onChange={(e) => setStreet(e.target.value)}
+            placeholder="Flat 402, Oakwood Greens, 100 Feet Rd"
+            required
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="City"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Bengaluru"
+              required
+            />
+            <Input
+              label="PIN Code"
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              placeholder="560038"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="State"
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+              placeholder="Karnataka"
+              required
+            />
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-charcoal-700">
+                Address Type
+              </label>
+              <div className="flex gap-2">
+                {(["Home", "Office", "Other"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setAddressType(t)}
+                    className={`flex-1 h-10 rounded-lg text-xs font-semibold border transition-all ${
+                      addressType === t
+                        ? "bg-secondary text-white border-secondary"
+                        : "bg-surface border-border text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

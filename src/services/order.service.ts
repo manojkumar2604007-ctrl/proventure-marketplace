@@ -10,7 +10,7 @@ export const orderService = {
   },
 
   async getCustomerOrders(customerId: string): Promise<Order[]> {
-    return localOrders.filter((o) => o.customerId === customerId);
+    return localOrders.filter((o) => o.customerId === customerId || o.customer?.id === customerId);
   },
 
   async getSellerOrders(sellerId: string): Promise<Order[]> {
@@ -24,7 +24,7 @@ export const orderService = {
   },
 
   async getOrderById(id: string): Promise<Order | null> {
-    return localOrders.find((o) => o.id === id) || null;
+    return localOrders.find((o) => o.id === id || o.orderNumber === id) || null;
   },
 
   async createOrder(data: {
@@ -117,5 +117,55 @@ export const orderService = {
 
     localOrders[orderIndex].updatedAt = new Date().toISOString();
     return localOrders[orderIndex];
+  },
+
+  async requestCancellation(orderId: string, reason?: string): Promise<{ success: boolean; order?: Order; message: string }> {
+    const order = localOrders.find((o) => o.id === orderId || o.orderNumber === orderId);
+    if (!order) return { success: false, message: "Order not found" };
+
+    if (order.status === "DELIVERED" || order.status === "SHIPPED") {
+      return { success: false, message: "Order is already in transit or delivered. Please request a return instead." };
+    }
+
+    if (typeof window !== "undefined") {
+      try {
+        await fetch(`/api/customer/orders/${encodeURIComponent(orderId)}/cancel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason }),
+        });
+      } catch {
+        // Continue with local update
+      }
+    }
+
+    order.status = "CANCELLED";
+    order.updatedAt = new Date().toISOString();
+    return { success: true, order, message: "Cancellation request processed successfully. Refund will be credited within 3-5 business days." };
+  },
+
+  async requestReturn(orderId: string, reason?: string): Promise<{ success: boolean; order?: Order; message: string }> {
+    const order = localOrders.find((o) => o.id === orderId || o.orderNumber === orderId);
+    if (!order) return { success: false, message: "Order not found" };
+
+    if (order.status !== "DELIVERED") {
+      return { success: false, message: "Returns can only be requested for delivered orders." };
+    }
+
+    if (typeof window !== "undefined") {
+      try {
+        await fetch(`/api/customer/orders/${encodeURIComponent(orderId)}/return`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason }),
+        });
+      } catch {
+        // Continue with local update
+      }
+    }
+
+    order.status = "REFUNDED";
+    order.updatedAt = new Date().toISOString();
+    return { success: true, order, message: "Return request accepted. Courier pickup scheduled within 48 hours." };
   },
 };
